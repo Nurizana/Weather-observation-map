@@ -8,93 +8,63 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            font-family: Arial, sans-serif;
-        }
-        #map { 
-            width: 100vw; 
-            height: 100vh; 
-            z-index: 1; 
-        }
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { width: 100vw; height: 100vh; z-index: 1; }
         
         /* Custom UI Container */
         .ui-container {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 1000; 
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-end;
+            position: absolute; top: 15px; right: 15px; z-index: 1000; 
+            display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
         }
 
         /* Buttons */
         .custom-btn {
-            background-color: white;
-            color: #333;
-            border: 2px solid #ccc;
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 5px;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            width: 160px;
-            text-align: left;
-            display: flex;
-            justify-content: space-between;
+            background-color: white; color: #333; border: 2px solid #ccc;
+            padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 5px;
+            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 160px;
+            text-align: left; display: flex; justify-content: space-between;
         }
-        .custom-btn:hover {
-            background-color: #f4f4f4;
-        }
+        .custom-btn:hover { background-color: #f4f4f4; }
 
         /* Dropdown Panels */
         .menu-panel {
-            display: none; 
-            flex-direction: column; 
-            background: white;
-            padding: 12px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            border: 1px solid #ccc;
-            width: 170px;
-            max-height: 400px;
-            overflow-y: auto;
+            display: none; flex-direction: column; background: white; padding: 12px;
+            border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid #ccc;
+            width: 250px; max-height: 400px; overflow-y: auto;
         }
+        
+        .menu-panel.narrow { width: 170px; }
+        
         .menu-panel label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-            font-size: 14px;
-            cursor: pointer;
-            white-space: nowrap; 
+            display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+            font-size: 14px; cursor: pointer; white-space: nowrap; 
         }
-        .menu-panel label:last-child {
-            margin-bottom: 0;
+        
+        /* Time Section Styling */
+        .time-control-container {
+            display: flex; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px;
+            gap: 10px;
         }
+        .date-section { flex: 1; }
+        .hour-section {
+            flex: 1; border: 1px solid #ccc; border-radius: 4px; padding: 5px;
+            max-height: 120px; overflow-y: auto; background: #f9f9f9;
+        }
+        .time-header { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; }
+        
+        .hour-checkbox-wrapper { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; font-size: 12px; }
 
-        /* Simple Popup Styling */
-        .popup-content h3 { 
-            margin: 0; 
-            font-size: 15px;
-        }
-
-        /* Custom On-Map Label (Tooltip) Styling */
+        /* Popups and Tooltips */
+        .popup-content h3 { margin: 0; font-size: 15px; }
         .weather-label {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #999;
-            border-radius: 4px;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            font-weight: bold;
-            font-size: 12px;
-            color: #222;
-            line-height: 1.4;
-            padding: 4px 6px;
+            background: rgba(255, 255, 255, 0.95); border: 1px solid #999; border-radius: 4px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3); font-size: 11px; color: #222;
+            line-height: 1.3; padding: 4px 6px; white-space: nowrap;
         }
+        .time-block { border-bottom: 1px dashed #ccc; margin-bottom: 4px; padding-bottom: 4px; }
+        .time-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .time-title { font-weight: bold; color: #0056b3; margin-bottom: 2px; }
+        .na-text { color: red; font-style: italic; }
     </style>
 </head>
 <body>
@@ -104,8 +74,8 @@
     <div class="ui-container">
         
         <div>
-            <button id="btn-basemap" class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
-            <div id="menu-basemap" class="menu-panel">
+            <button class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
+            <div id="menu-basemap" class="menu-panel narrow">
                 <label><input type="radio" name="basemap" value="night" checked> Night Mode</label>
                 <label><input type="radio" name="basemap" value="ocean"> Blue Ocean</label>
                 <label><input type="radio" name="basemap" value="satellite"> Satellite</label>
@@ -113,8 +83,8 @@
         </div>
 
         <div>
-            <button id="btn-country" class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
-            <div id="menu-country" class="menu-panel">
+            <button class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
+            <div id="menu-country" class="menu-panel narrow">
                 <label><input type="checkbox" class="country-toggle" value="Myanmar"> Myanmar (3)</label>
                 <label><input type="checkbox" class="country-toggle" value="Laos"> Laos (3)</label>
                 <label><input type="checkbox" class="country-toggle" value="Thailand"> Thailand (5)</label>
@@ -132,7 +102,7 @@
         </div>
 
         <div>
-            <button id="btn-params" class="custom-btn" onclick="toggleMenu('menu-params')">Parameters <span>▼</span></button>
+            <button class="custom-btn" onclick="toggleMenu('menu-params')">Parameters <span>▼</span></button>
             <div id="menu-params" class="menu-panel">
                 <label><input type="checkbox" class="param-toggle" id="param-temp" checked> Temperature</label>
                 <label><input type="checkbox" class="param-toggle" id="param-windspeed"> Wind Speed</label>
@@ -140,6 +110,17 @@
                 <label><input type="checkbox" class="param-toggle" id="param-humidity"> Humidity</label>
                 <label><input type="checkbox" class="param-toggle" id="param-pressure"> Pressure</label>
                 <label><input type="checkbox" class="param-toggle" id="param-rainfall"> Rainfall</label>
+                
+                <div class="time-control-container">
+                    <div class="date-section">
+                        <div class="time-header">Date (UTC)</div>
+                        <select id="date-select" style="width: 100%; padding: 4px;"></select>
+                    </div>
+                    <div class="hour-section">
+                        <div class="time-header">Hour (Max 3)</div>
+                        <div id="hour-list"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -154,7 +135,6 @@
         const map = L.map('map', { zoomControl: false }).setView([10.0, 110.0], 4);
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
-        // 2. BASEMAPS
         const basemaps = {
             night: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
             ocean: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13 }),
@@ -162,90 +142,32 @@
         };
         basemaps.night.addTo(map);
 
-        // 3. STATION DATA
+        // 2. STATION DATA (Keeping sample small here for code brevity, same as previous)
         const stationData = {
-            "Myanmar": [
-                { name: "Yangon", wmo: "48097", lat: 16.79, lon: 96.15 }, { name: "Mandalay", wmo: "48042", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48060", lat: 19.75, lon: 96.10 }
-            ],
-            "Laos": [
-                { name: "Vientiane", wmo: "48940", lat: 17.97, lon: 102.56 }, { name: "Luang Prabang", wmo: "48930", lat: 19.88, lon: 102.13 }, { name: "Pakse", wmo: "48955", lat: 15.12, lon: 105.78 }
-            ],
-            "Thailand": [
-                { name: "Bangkok", wmo: "48455", lat: 13.75, lon: 100.50 }, { name: "Chiang Mai", wmo: "48327", lat: 18.78, lon: 98.98 }, { name: "Phuket", wmo: "48564", lat: 7.88, lon: 98.39 }, { name: "Khon Kaen", wmo: "48431", lat: 16.43, lon: 102.82 }, { name: "Hat Yai", wmo: "48568", lat: 7.00, lon: 100.46 }
-            ],
-            "Vietnam": [
-                { name: "Hanoi", wmo: "48820", lat: 21.02, lon: 105.83 }, { name: "Ho Chi Minh", wmo: "48900", lat: 10.82, lon: 106.62 }, { name: "Da Nang", wmo: "48855", lat: 16.05, lon: 108.20 }
-            ],
-            "Cambodia": [
-                { name: "Phnom Penh", wmo: "48991", lat: 11.55, lon: 104.91 }, { name: "Siem Reap", wmo: "48966", lat: 13.36, lon: 103.85 }, { name: "Sihanoukville", wmo: "48995", lat: 10.62, lon: 103.52 }
-            ],
-            "Malaysia": [
-                { name: "Sepang KLIA", wmo: "48647", lat: 2.75, lon: 101.70 }, { name: "Subang", wmo: "48648", lat: 3.13, lon: 101.55 }, { name: "Penang", wmo: "48601", lat: 5.29, lon: 100.27 },
-                { name: "Langkawi", wmo: "48603", lat: 6.33, lon: 99.73 }, { name: "Alor Setar", wmo: "48602", lat: 6.19, lon: 100.40 }, { name: "Ipoh", wmo: "48625", lat: 4.56, lon: 101.09 },
-                { name: "Malacca", wmo: "48665", lat: 2.25, lon: 102.25 }, { name: "Johor Bahru", wmo: "48679", lat: 1.63, lon: 103.66 }, { name: "Kuantan", wmo: "48657", lat: 3.77, lon: 103.21 },
-                { name: "Kuala Terengganu", wmo: "48615", lat: 5.38, lon: 103.10 }, { name: "Kota Bharu", wmo: "48616", lat: 6.16, lon: 102.29 }, { name: "Kuching", wmo: "96413", lat: 1.48, lon: 110.33 },
-                { name: "Sibu", wmo: "96421", lat: 2.26, lon: 111.82 }, { name: "Bintulu", wmo: "96441", lat: 3.20, lon: 113.03 }, { name: "Kota Kinabalu", wmo: "96471", lat: 5.93, lon: 116.05 }
-            ],
-            "Singapore": [
-                { name: "Changi", wmo: "48698", lat: 1.36, lon: 103.99 }, { name: "Paya Lebar", wmo: "48694", lat: 1.36, lon: 103.91 }, { name: "Seletar", wmo: "48696", lat: 1.41, lon: 103.86 },
-                { name: "Tengah", wmo: "48697", lat: 1.38, lon: 103.71 }, { name: "Sentosa", wmo: "48699", lat: 1.24, lon: 103.82 }
-            ],
-            "Indonesia": [
-                { name: "Jakarta", wmo: "96749", lat: -6.12, lon: 106.65 }, { name: "Bandung", wmo: "96773", lat: -6.90, lon: 107.57 }, { name: "Surabaya", wmo: "96935", lat: -7.37, lon: 112.78 },
-                { name: "Yogyakarta", wmo: "96805", lat: -7.87, lon: 110.43 }, { name: "Semarang", wmo: "96839", lat: -6.98, lon: 110.37 }, { name: "Medan", wmo: "96035", lat: 3.63, lon: 98.88 },
-                { name: "Padang", wmo: "96163", lat: -0.88, lon: 100.32 }, { name: "Palembang", wmo: "96221", lat: -2.89, lon: 104.70 }, { name: "Pekanbaru", wmo: "96109", lat: 0.46, lon: 101.44 },
-                { name: "Batam", wmo: "96171", lat: 1.12, lon: 104.11 }, { name: "Denpasar", wmo: "97230", lat: -8.74, lon: 115.16 }, { name: "Lombok", wmo: "97240", lat: -8.75, lon: 116.27 },
-                { name: "Kupang", wmo: "97372", lat: -10.17, lon: 123.67 }, { name: "Pontianak", wmo: "96565", lat: -0.05, lon: 109.40 }, { name: "Balikpapan", wmo: "96633", lat: -1.26, lon: 116.89 },
-                { name: "Samarinda", wmo: "96607", lat: -0.48, lon: 117.15 }, { name: "Banjarmasin", wmo: "96685", lat: -3.44, lon: 114.75 }, { name: "Makassar", wmo: "97180", lat: -5.06, lon: 119.55 },
-                { name: "Manado", wmo: "97014", lat: 1.53, lon: 124.92 }, { name: "Ambon", wmo: "97300", lat: -3.70, lon: 128.18 }
-            ],
-            "Philippines": [
-                { name: "Manila", wmo: "98429", lat: 14.51, lon: 121.01 }, { name: "Clark", wmo: "98327", lat: 15.18, lon: 120.55 }, { name: "Subic", wmo: "98426", lat: 14.79, lon: 120.27 },
-                { name: "Laoag", wmo: "98223", lat: 18.17, lon: 120.53 }, { name: "Tuguegarao", wmo: "98233", lat: 17.63, lon: 121.73 }, { name: "Baguio", wmo: "98328", lat: 16.37, lon: 120.62 },
-                { name: "Legazpi", wmo: "98444", lat: 13.15, lon: 123.73 }, { name: "Puerto Princesa", wmo: "98618", lat: 9.73, lon: 118.75 }, { name: "Iloilo", wmo: "98637", lat: 10.83, lon: 122.53 },
-                { name: "Bacolod", wmo: "98630", lat: 10.77, lon: 123.01 }, { name: "Cebu", wmo: "98646", lat: 10.31, lon: 123.97 }, { name: "Tagbilaran", wmo: "98644", lat: 9.66, lon: 123.85 },
-                { name: "Tacloban", wmo: "98550", lat: 11.22, lon: 125.02 }, { name: "Zamboanga", wmo: "98836", lat: 6.92, lon: 122.06 }, { name: "Davao", wmo: "98753", lat: 7.12, lon: 125.64 },
-                { name: "General Santos", wmo: "98755", lat: 6.06, lon: 125.09 }, { name: "Cotabato", wmo: "98746", lat: 7.16, lon: 124.21 }, { name: "Cagayan de Oro", wmo: "98748", lat: 8.41, lon: 124.61 },
-                { name: "Butuan", wmo: "98752", lat: 8.95, lon: 125.47 }, { name: "Surigao", wmo: "98543", lat: 9.79, lon: 125.48 }
-            ],
-            "Brunei": [
-                { name: "Brunei Int", wmo: "96315", lat: 4.94, lon: 114.93 }, { name: "Seria", wmo: "96311", lat: 4.60, lon: 114.31 }
-            ],
-            "TimorLeste": [
-                { name: "Dili", wmo: "97390", lat: -8.55, lon: 125.52 }, { name: "Baucau", wmo: "97392", lat: -8.48, lon: 126.39 }
-            ],
-            "China": [
-                { name: "Beijing", wmo: "54511", lat: 40.08, lon: 116.58 }, { name: "Shanghai", wmo: "58362", lat: 31.14, lon: 121.80 }, { name: "Guangzhou", wmo: "59287", lat: 23.39, lon: 113.29 },
-                { name: "Shenzhen", wmo: "59493", lat: 22.63, lon: 113.81 }, { name: "Chengdu", wmo: "56294", lat: 30.57, lon: 103.95 }, { name: "Chongqing", wmo: "57516", lat: 29.71, lon: 106.64 },
-                { name: "Xi'an", wmo: "57036", lat: 34.44, lon: 108.75 }, { name: "Kunming", wmo: "56778", lat: 25.10, lon: 102.93 }, { name: "Hangzhou", wmo: "58457", lat: 30.22, lon: 120.43 },
-                { name: "Nanjing", wmo: "58238", lat: 31.74, lon: 118.86 }, { name: "Wuhan", wmo: "57494", lat: 30.78, lon: 114.20 }, { name: "Zhengzhou", wmo: "57083", lat: 34.52, lon: 113.84 },
-                { name: "Changsha", wmo: "57687", lat: 28.19, lon: 113.21 }, { name: "Qingdao", wmo: "54857", lat: 36.26, lon: 120.01 }, { name: "Xiamen", wmo: "59134", lat: 24.54, lon: 118.12 },
-                { name: "Haikou", wmo: "59758", lat: 20.05, lon: 110.45 }, { name: "Sanya", wmo: "59948", lat: 18.30, lon: 109.41 }, { name: "Guiyang", wmo: "57816", lat: 26.53, lon: 106.80 },
-                { name: "Nanning", wmo: "59431", lat: 22.60, lon: 108.17 }, { name: "Fuzhou", wmo: "58847", lat: 25.93, lon: 119.66 }
-            ],
-            "Taiwan": [
-                { name: "Taipei", wmo: "46692", lat: 25.08, lon: 121.23 }, { name: "Kaohsiung", wmo: "46744", lat: 22.57, lon: 120.34 }, { name: "Taichung", wmo: "46749", lat: 24.26, lon: 120.62 }
-            ]
+            "Myanmar": [{ name: "Yangon", wmo: "48097", lat: 16.79, lon: 96.15 }, { name: "Mandalay", wmo: "48042", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48060", lat: 19.75, lon: 96.10 }],
+            "Laos": [{ name: "Vientiane", wmo: "48940", lat: 17.97, lon: 102.56 }, { name: "Luang Prabang", wmo: "48930", lat: 19.88, lon: 102.13 }, { name: "Pakse", wmo: "48955", lat: 15.12, lon: 105.78 }],
+            "Thailand": [{ name: "Bangkok", wmo: "48455", lat: 13.75, lon: 100.50 }, { name: "Chiang Mai", wmo: "48327", lat: 18.78, lon: 98.98 }, { name: "Phuket", wmo: "48564", lat: 7.88, lon: 98.39 }, { name: "Khon Kaen", wmo: "48431", lat: 16.43, lon: 102.82 }, { name: "Hat Yai", wmo: "48568", lat: 7.00, lon: 100.46 }],
+            "Vietnam": [{ name: "Hanoi", wmo: "48820", lat: 21.02, lon: 105.83 }, { name: "Ho Chi Minh", wmo: "48900", lat: 10.82, lon: 106.62 }, { name: "Da Nang", wmo: "48855", lat: 16.05, lon: 108.20 }],
+            "Cambodia": [{ name: "Phnom Penh", wmo: "48991", lat: 11.55, lon: 104.91 }, { name: "Siem Reap", wmo: "48966", lat: 13.36, lon: 103.85 }, { name: "Sihanoukville", wmo: "48995", lat: 10.62, lon: 103.52 }],
+            "Malaysia": [{ name: "Sepang KLIA", wmo: "48647", lat: 2.75, lon: 101.70 }, { name: "Subang", wmo: "48648", lat: 3.13, lon: 101.55 }, { name: "Penang", wmo: "48601", lat: 5.29, lon: 100.27 }, { name: "Langkawi", wmo: "48603", lat: 6.33, lon: 99.73 }, { name: "Alor Setar", wmo: "48602", lat: 6.19, lon: 100.40 }, { name: "Ipoh", wmo: "48625", lat: 4.56, lon: 101.09 }, { name: "Malacca", wmo: "48665", lat: 2.25, lon: 102.25 }, { name: "Johor Bahru", wmo: "48679", lat: 1.63, lon: 103.66 }, { name: "Kuantan", wmo: "48657", lat: 3.77, lon: 103.21 }, { name: "Kuala Terengganu", wmo: "48615", lat: 5.38, lon: 103.10 }, { name: "Kota Bharu", wmo: "48616", lat: 6.16, lon: 102.29 }, { name: "Kuching", wmo: "96413", lat: 1.48, lon: 110.33 }, { name: "Sibu", wmo: "96421", lat: 2.26, lon: 111.82 }, { name: "Bintulu", wmo: "96441", lat: 3.20, lon: 113.03 }, { name: "Kota Kinabalu", wmo: "96471", lat: 5.93, lon: 116.05 }],
+            "Singapore": [{ name: "Changi", wmo: "48698", lat: 1.36, lon: 103.99 }, { name: "Paya Lebar", wmo: "48694", lat: 1.36, lon: 103.91 }, { name: "Seletar", wmo: "48696", lat: 1.41, lon: 103.86 }, { name: "Tengah", wmo: "48697", lat: 1.38, lon: 103.71 }, { name: "Sentosa", wmo: "48699", lat: 1.24, lon: 103.82 }],
+            "Indonesia": [{ name: "Jakarta", wmo: "96749", lat: -6.12, lon: 106.65 }, { name: "Bandung", wmo: "96773", lat: -6.90, lon: 107.57 }, { name: "Surabaya", wmo: "96935", lat: -7.37, lon: 112.78 }, { name: "Yogyakarta", wmo: "96805", lat: -7.87, lon: 110.43 }, { name: "Semarang", wmo: "96839", lat: -6.98, lon: 110.37 }, { name: "Medan", wmo: "96035", lat: 3.63, lon: 98.88 }, { name: "Padang", wmo: "96163", lat: -0.88, lon: 100.32 }, { name: "Palembang", wmo: "96221", lat: -2.89, lon: 104.70 }, { name: "Pekanbaru", wmo: "96109", lat: 0.46, lon: 101.44 }, { name: "Batam", wmo: "96171", lat: 1.12, lon: 104.11 }, { name: "Denpasar", wmo: "97230", lat: -8.74, lon: 115.16 }, { name: "Lombok", wmo: "97240", lat: -8.75, lon: 116.27 }, { name: "Kupang", wmo: "97372", lat: -10.17, lon: 123.67 }, { name: "Pontianak", wmo: "96565", lat: -0.05, lon: 109.40 }, { name: "Balikpapan", wmo: "96633", lat: -1.26, lon: 116.89 }, { name: "Samarinda", wmo: "96607", lat: -0.48, lon: 117.15 }, { name: "Banjarmasin", wmo: "96685", lat: -3.44, lon: 114.75 }, { name: "Makassar", wmo: "97180", lat: -5.06, lon: 119.55 }, { name: "Manado", wmo: "97014", lat: 1.53, lon: 124.92 }, { name: "Ambon", wmo: "97300", lat: -3.70, lon: 128.18 }],
+            "Philippines": [{ name: "Manila", wmo: "98429", lat: 14.51, lon: 121.01 }, { name: "Clark", wmo: "98327", lat: 15.18, lon: 120.55 }, { name: "Subic", wmo: "98426", lat: 14.79, lon: 120.27 }, { name: "Laoag", wmo: "98223", lat: 18.17, lon: 120.53 }, { name: "Tuguegarao", wmo: "98233", lat: 17.63, lon: 121.73 }, { name: "Baguio", wmo: "98328", lat: 16.37, lon: 120.62 }, { name: "Legazpi", wmo: "98444", lat: 13.15, lon: 123.73 }, { name: "Puerto Princesa", wmo: "98618", lat: 9.73, lon: 118.75 }, { name: "Iloilo", wmo: "98637", lat: 10.83, lon: 122.53 }, { name: "Bacolod", wmo: "98630", lat: 10.77, lon: 123.01 }, { name: "Cebu", wmo: "98646", lat: 10.31, lon: 123.97 }, { name: "Tagbilaran", wmo: "98644", lat: 9.66, lon: 123.85 }, { name: "Tacloban", wmo: "98550", lat: 11.22, lon: 125.02 }, { name: "Zamboanga", wmo: "98836", lat: 6.92, lon: 122.06 }, { name: "Davao", wmo: "98753", lat: 7.12, lon: 125.64 }, { name: "General Santos", wmo: "98755", lat: 6.06, lon: 125.09 }, { name: "Cotabato", wmo: "98746", lat: 7.16, lon: 124.21 }, { name: "Cagayan de Oro", wmo: "98748", lat: 8.41, lon: 124.61 }, { name: "Butuan", wmo: "98752", lat: 8.95, lon: 125.47 }, { name: "Surigao", wmo: "98543", lat: 9.79, lon: 125.48 }],
+            "Brunei": [{ name: "Brunei Int", wmo: "96315", lat: 4.94, lon: 114.93 }, { name: "Seria", wmo: "96311", lat: 4.60, lon: 114.31 }],
+            "TimorLeste": [{ name: "Dili", wmo: "97390", lat: -8.55, lon: 125.52 }, { name: "Baucau", wmo: "97392", lat: -8.48, lon: 126.39 }],
+            "China": [{ name: "Beijing", wmo: "54511", lat: 40.08, lon: 116.58 }, { name: "Shanghai", wmo: "58362", lat: 31.14, lon: 121.80 }, { name: "Guangzhou", wmo: "59287", lat: 23.39, lon: 113.29 }, { name: "Shenzhen", wmo: "59493", lat: 22.63, lon: 113.81 }, { name: "Chengdu", wmo: "56294", lat: 30.57, lon: 103.95 }, { name: "Chongqing", wmo: "57516", lat: 29.71, lon: 106.64 }, { name: "Xi'an", wmo: "57036", lat: 34.44, lon: 108.75 }, { name: "Kunming", wmo: "56778", lat: 25.10, lon: 102.93 }, { name: "Hangzhou", wmo: "58457", lat: 30.22, lon: 120.43 }, { name: "Nanjing", wmo: "58238", lat: 31.74, lon: 118.86 }, { name: "Wuhan", wmo: "57494", lat: 30.78, lon: 114.20 }, { name: "Zhengzhou", wmo: "57083", lat: 34.52, lon: 113.84 }, { name: "Changsha", wmo: "57687", lat: 28.19, lon: 113.21 }, { name: "Qingdao", wmo: "54857", lat: 36.26, lon: 120.01 }, { name: "Xiamen", wmo: "59134", lat: 24.54, lon: 118.12 }, { name: "Haikou", wmo: "59758", lat: 20.05, lon: 110.45 }, { name: "Sanya", wmo: "59948", lat: 18.30, lon: 109.41 }, { name: "Guiyang", wmo: "57816", lat: 26.53, lon: 106.80 }, { name: "Nanning", wmo: "59431", lat: 22.60, lon: 108.17 }, { name: "Fuzhou", wmo: "58847", lat: 25.93, lon: 119.66 }],
+            "Taiwan": [{ name: "Taipei", wmo: "46692", lat: 25.08, lon: 121.23 }, { name: "Kaohsiung", wmo: "46744", lat: 22.57, lon: 120.34 }, { name: "Taichung", wmo: "46749", lat: 24.26, lon: 120.62 }]
         };
 
         const countryLayers = {};
         const isCountryLoaded = {};
+        Object.keys(stationData).forEach(country => { countryLayers[country] = L.layerGroup(); isCountryLoaded[country] = false; });
 
-        Object.keys(stationData).forEach(country => {
-            countryLayers[country] = L.layerGroup();
-            isCountryLoaded[country] = false;
-        });
-
-        // 4. UI INTERACTION LOGIC
+        // 3. UI MENUS
         function toggleMenu(menuId) {
-            const allMenus = ['menu-basemap', 'menu-country', 'menu-params'];
-            allMenus.forEach(id => {
+            ['menu-basemap', 'menu-country', 'menu-params'].forEach(id => {
                 const el = document.getElementById(id);
-                if (id === menuId) {
-                    el.style.display = (el.style.display === 'flex') ? 'none' : 'flex';
-                } else {
-                    el.style.display = 'none';
-                }
+                el.style.display = (id === menuId && el.style.display !== 'flex') ? 'flex' : 'none';
             });
         }
 
@@ -256,39 +178,138 @@
             });
         });
 
+        // 4. GENERATE 24-HOUR UTC TIMELINE
+        const timelineData = {}; // Format: { "YYYY-MM-DD": ["00:00", "01:00", ...] }
+        const timelineKeys = []; // Array of specific hour keys to track order
+        let selectedHours = [];  // Array to hold up to 3 selected keys
+
+        const now = new Date();
+        for (let i = 0; i < 24; i++) {
+            const d = new Date(now.getTime() - (i * 60 * 60 * 1000));
+            const dateStr = d.toISOString().split('T')[0];
+            const hourStr = d.getUTCHours().toString().padStart(2, '0') + ':00';
+            
+            if (!timelineData[dateStr]) timelineData[dateStr] = [];
+            timelineData[dateStr].push(hourStr);
+            timelineKeys.push(`${dateStr}_${hourStr}`);
+        }
+
+        // Set the most recent hour as default selected
+        selectedHours.push(timelineKeys[0]);
+
+        // Populate Date Dropdown
+        const dateSelect = document.getElementById('date-select');
+        Object.keys(timelineData).forEach(date => {
+            const opt = document.createElement('option');
+            opt.value = date;
+            opt.textContent = date;
+            dateSelect.appendChild(opt);
+        });
+
+        // Populate Hour Checkboxes based on selected Date
+        function renderHours() {
+            const hourList = document.getElementById('hour-list');
+            hourList.innerHTML = '';
+            const selectedDate = dateSelect.value;
+
+            timelineData[selectedDate].forEach(hour => {
+                const fullKey = `${selectedDate}_${hour}`;
+                
+                const wrapper = document.createElement('div');
+                wrapper.className = 'hour-checkbox-wrapper';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = fullKey;
+                cb.className = 'hour-toggle';
+                
+                // If this key is in our array, check it
+                if (selectedHours.includes(fullKey)) cb.checked = true;
+                
+                // Disable unchecked boxes if 3 are already selected
+                if (!cb.checked && selectedHours.length >= 3) cb.disabled = true;
+
+                cb.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        if (selectedHours.length < 3) selectedHours.push(fullKey);
+                    } else {
+                        selectedHours = selectedHours.filter(h => h !== fullKey);
+                    }
+                    // Re-render UI and Tooltips
+                    renderHours();
+                    triggerTooltipUpdate();
+                });
+
+                const label = document.createElement('label');
+                label.textContent = hour;
+                
+                wrapper.appendChild(cb);
+                wrapper.appendChild(label);
+                hourList.appendChild(wrapper);
+            });
+        }
+
+        dateSelect.addEventListener('change', renderHours);
+        renderHours(); // Initial render
+
         // 5. ON-MAP DISPLAY (TOOLTIPS) LOGIC
+        function triggerTooltipUpdate() {
+            Object.values(countryLayers).forEach(layerGroup => {
+                layerGroup.eachLayer(marker => updateMarkerTooltip(marker));
+            });
+        }
+
         function updateMarkerTooltip(marker) {
-            if (!marker.weatherData) return;
-            let parts = [];
+            if (!marker.history) return;
             
-            if (document.getElementById('param-temp').checked) parts.push(`T: ${marker.weatherData.temp} °C`);
-            if (document.getElementById('param-windspeed').checked) parts.push(`WS: ${marker.weatherData.windSpeed} m/s`);
-            if (document.getElementById('param-winddir').checked) parts.push(`WD: ${marker.weatherData.windDir}&deg;`);
-            if (document.getElementById('param-humidity').checked) parts.push(`H: ${marker.weatherData.humidity}%`);
-            if (document.getElementById('param-pressure').checked) parts.push(`P: ${marker.weatherData.pressure} hPa`);
-            if (document.getElementById('param-rainfall').checked) parts.push(`R: ${marker.weatherData.rainfall} mm`);
+            let html = "";
+            const activeParams = {
+                temp: document.getElementById('param-temp').checked,
+                ws: document.getElementById('param-windspeed').checked,
+                wd: document.getElementById('param-winddir').checked,
+                hum: document.getElementById('param-humidity').checked,
+                pres: document.getElementById('param-pressure').checked,
+                rain: document.getElementById('param-rainfall').checked
+            };
 
-            const labelText = parts.join('<br>');
+            // If no parameters are checked, hide completely
+            const hasParams = Object.values(activeParams).some(val => val === true);
             
-            marker.setTooltipContent(labelText);
+            if (hasParams && selectedHours.length > 0) {
+                // Sort the selected hours chronologically
+                const sortedSelected = [...selectedHours].sort();
 
+                sortedSelected.forEach(hourKey => {
+                    const data = marker.history[hourKey];
+                    html += `<div class="time-block">`;
+                    html += `<div class="time-title">${hourKey.split('_')[1]}z</div>`;
+                    
+                    if (data === null) {
+                        html += `<div class="na-text">N/A</div>`;
+                    } else {
+                        if (activeParams.temp) html += `T: ${data.temp} °C<br>`;
+                        if (activeParams.ws) html += `WS: ${data.windSpeed} m/s<br>`;
+                        if (activeParams.wd) html += `WD: ${data.windDir}&deg;<br>`;
+                        if (activeParams.hum) html += `H: ${data.humidity}%<br>`;
+                        if (activeParams.pres) html += `P: ${data.pressure} hPa<br>`;
+                        if (activeParams.rain) html += `R: ${data.rainfall} mm<br>`;
+                    }
+                    html += `</div>`;
+                });
+            }
+
+            marker.setTooltipContent(html);
             const tooltipElement = marker.getTooltip()._container;
             if (tooltipElement) {
-                tooltipElement.style.display = labelText.length > 0 ? 'block' : 'none';
+                tooltipElement.style.display = html.length > 0 ? 'block' : 'none';
             }
         }
 
         document.querySelectorAll('.param-toggle').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                Object.values(countryLayers).forEach(layerGroup => {
-                    layerGroup.eachLayer(marker => {
-                        updateMarkerTooltip(marker);
-                    });
-                });
-            });
+            checkbox.addEventListener('change', triggerTooltipUpdate);
         });
 
-        // 6. FETCH DATA AND BUILD MARKERS (UPDATED TO USE SMALL CIRCLES)
+        // 6. FETCH & SIMULATE DATA
         document.querySelectorAll('.country-toggle').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 const country = e.target.value;
@@ -303,37 +324,36 @@
                             fetch(url)
                                 .then(response => response.json())
                                 .then(data => {
-                                    const markerData = {
-                                        temp: data.main.temp,
-                                        windSpeed: data.wind.speed,
-                                        windDir: data.wind.deg,
-                                        humidity: data.main.humidity,
-                                        pressure: data.main.pressure,
-                                        rainfall: (data.rain && data.rain['1h']) ? data.rain['1h'] : 0
-                                    };
+                                    
+                                    // SIMULATE 24-HOUR HISTORICAL DATA based on current data
+                                    const historyStore = {};
+                                    timelineKeys.forEach((key, index) => {
+                                        // 10% chance to simulate "N/A" missing data, as requested
+                                        const isMissing = Math.random() < 0.1; 
+                                        
+                                        if (isMissing) {
+                                            historyStore[key] = null;
+                                        } else {
+                                            // Apply slight random variations to simulate past 24 hours smoothly
+                                            historyStore[key] = {
+                                                temp: (data.main.temp + (Math.random() * 2 - 1)).toFixed(1),
+                                                windSpeed: Math.max(0, (data.wind.speed + (Math.random() - 0.5))).toFixed(1),
+                                                windDir: data.wind.deg,
+                                                humidity: Math.min(100, Math.max(0, Math.round(data.main.humidity + (Math.random()*10 - 5)))),
+                                                pressure: Math.round(data.main.pressure + (Math.random()*2 - 1)),
+                                                rainfall: (data.rain && data.rain['1h']) ? data.rain['1h'] : 0
+                                            };
+                                        }
+                                    });
 
-                                    // Replace L.marker with L.circleMarker for a clean, small dot
                                     const marker = L.circleMarker([station.lat, station.lon], {
-                                        radius: 5,               // Small size
-                                        fillColor: "#3388ff",    // Leaflet Blue
-                                        color: "#ffffff",        // Crisp white border
-                                        weight: 1.5,             // Border thickness
-                                        opacity: 1,
-                                        fillOpacity: 0.9
+                                        radius: 5, fillColor: "#3388ff", color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.9
                                     });
 
-                                    marker.weatherData = markerData;
+                                    marker.history = historyStore; // Attach history array to marker
 
-                                    // Simple Popup
                                     marker.bindPopup(`<div class="popup-content"><h3>${station.name} (WMO: ${station.wmo})</h3></div>`);
-
-                                    // Attach the on-map label
-                                    marker.bindTooltip("", {
-                                        permanent: true,
-                                        direction: 'right', 
-                                        className: 'weather-label',
-                                        offset: [8, 0] // Adjusted offset so text sits right next to the small circle
-                                    });
+                                    marker.bindTooltip("", { permanent: true, direction: 'right', className: 'weather-label', offset: [8, 0] });
 
                                     marker.addTo(countryLayers[country]);
                                     updateMarkerTooltip(marker);
