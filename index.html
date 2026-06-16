@@ -51,10 +51,10 @@
             background-color: #f4f4f4;
         }
 
-        /* Dropdown Panels - Fixed to be strictly vertical */
+        /* Dropdown Panels */
         .menu-panel {
-            display: none; /* Hidden by default */
-            flex-direction: column; /* FORCES vertical stacking */
+            display: none; 
+            flex-direction: column; 
             background: white;
             padding: 12px;
             border-radius: 5px;
@@ -71,15 +71,30 @@
             margin-bottom: 8px;
             font-size: 14px;
             cursor: pointer;
-            white-space: nowrap; /* Prevents text from wrapping weirdly */
+            white-space: nowrap; 
         }
         .menu-panel label:last-child {
             margin-bottom: 0;
         }
 
-        /* Popup Styling */
-        .popup-content h3 { margin: 0 0 5px 0; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-        .popup-content p { margin: 4px 0; }
+        /* Simple Popup Styling (Name & WMO Only) */
+        .popup-content h3 { 
+            margin: 0; 
+            font-size: 15px;
+        }
+
+        /* Custom On-Map Label (Tooltip) Styling */
+        .weather-label {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #999;
+            border-radius: 4px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            font-weight: bold;
+            font-size: 12px;
+            color: #222;
+            line-height: 1.4;
+            padding: 4px 6px;
+        }
     </style>
 </head>
 <body>
@@ -120,11 +135,11 @@
             <button id="btn-params" class="custom-btn" onclick="toggleMenu('menu-params')">Parameters <span>▼</span></button>
             <div id="menu-params" class="menu-panel">
                 <label><input type="checkbox" class="param-toggle" id="param-temp" checked> Temperature</label>
-                <label><input type="checkbox" class="param-toggle" id="param-windspeed" checked> Wind Speed</label>
-                <label><input type="checkbox" class="param-toggle" id="param-winddir" checked> Wind Direction</label>
-                <label><input type="checkbox" class="param-toggle" id="param-humidity" checked> Humidity</label>
-                <label><input type="checkbox" class="param-toggle" id="param-pressure" checked> Pressure</label>
-                <label><input type="checkbox" class="param-toggle" id="param-rainfall" checked> Rainfall</label>
+                <label><input type="checkbox" class="param-toggle" id="param-windspeed"> Wind Speed</label>
+                <label><input type="checkbox" class="param-toggle" id="param-winddir"> Wind Direction</label>
+                <label><input type="checkbox" class="param-toggle" id="param-humidity"> Humidity</label>
+                <label><input type="checkbox" class="param-toggle" id="param-pressure"> Pressure</label>
+                <label><input type="checkbox" class="param-toggle" id="param-rainfall"> Rainfall</label>
             </div>
         </div>
 
@@ -145,9 +160,9 @@
             ocean: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13 }),
             satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')
         };
-        basemaps.night.addTo(map); // Default
+        basemaps.night.addTo(map);
 
-        // 3. STATION DATA (With WMO Numbers Added)
+        // 3. STATION DATA
         const stationData = {
             "Myanmar": [
                 { name: "Yangon", wmo: "48097", lat: 16.79, lon: 96.15 }, { name: "Mandalay", wmo: "48042", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48060", lat: 19.75, lon: 96.10 }
@@ -222,8 +237,6 @@
         });
 
         // 4. UI INTERACTION LOGIC
-        
-        // This function ensures only one dropdown menu is open at a time
         function toggleMenu(menuId) {
             const allMenus = ['menu-basemap', 'menu-country', 'menu-params'];
             allMenus.forEach(id => {
@@ -236,7 +249,6 @@
             });
         }
 
-        // Change Basemap
         document.querySelectorAll('input[name="basemap"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 Object.values(basemaps).forEach(layer => map.removeLayer(layer));
@@ -244,35 +256,44 @@
             });
         });
 
-        // 5. DYNAMIC POPUP GENERATOR
-        // This creates the HTML for the box based on exactly what parameters are checked.
-        function generatePopupContent(data) {
-            let html = `<div class="popup-content">`;
-            html += `<h3>${data.name} (WMO: ${data.wmo})</h3>`; // Name and WMO always show
+        // 5. ON-MAP DISPLAY (TOOLTIPS) LOGIC
+        // This function formats the text string for the map label based on checkboxes
+        function updateMarkerTooltip(marker) {
+            if (!marker.weatherData) return;
+            let parts = [];
             
-            if (document.getElementById('param-temp').checked) html += `<p><strong>Temperature:</strong> ${data.temp} °C</p>`;
-            if (document.getElementById('param-windspeed').checked) html += `<p><strong>Wind Speed:</strong> ${data.windSpeed} m/s</p>`;
-            if (document.getElementById('param-winddir').checked) html += `<p><strong>Wind Direction:</strong> ${data.windDir}&deg;</p>`;
-            if (document.getElementById('param-humidity').checked) html += `<p><strong>Humidity:</strong> ${data.humidity}%</p>`;
-            if (document.getElementById('param-pressure').checked) html += `<p><strong>Pressure:</strong> ${data.pressure} hPa</p>`;
-            if (document.getElementById('param-rainfall').checked) html += `<p><strong>Rainfall (1h):</strong> ${data.rainfall} mm</p>`;
+            if (document.getElementById('param-temp').checked) parts.push(`T: ${marker.weatherData.temp} °C`);
+            if (document.getElementById('param-windspeed').checked) parts.push(`WS: ${marker.weatherData.windSpeed} m/s`);
+            if (document.getElementById('param-winddir').checked) parts.push(`WD: ${marker.weatherData.windDir}&deg;`);
+            if (document.getElementById('param-humidity').checked) parts.push(`H: ${marker.weatherData.humidity}%`);
+            if (document.getElementById('param-pressure').checked) parts.push(`P: ${marker.weatherData.pressure} hPa`);
+            if (document.getElementById('param-rainfall').checked) parts.push(`R: ${marker.weatherData.rainfall} mm`);
+
+            const labelText = parts.join('<br>');
             
-            html += `</div>`;
-            return html;
+            // Set the generated text
+            marker.setTooltipContent(labelText);
+
+            // Access the actual HTML container of the Leaflet tooltip to hide/show it safely
+            const tooltipElement = marker.getTooltip()._container;
+            if (tooltipElement) {
+                // If text is empty (no params checked), hide the box. Otherwise, show it.
+                tooltipElement.style.display = labelText.length > 0 ? 'block' : 'none';
+            }
         }
 
-        // Update any popups that are currently open when a parameter is toggled
+        // Triggers the update on every marker on the map when a parameter is checked/unchecked
         document.querySelectorAll('.param-toggle').forEach(checkbox => {
             checkbox.addEventListener('change', () => {
-                map.eachLayer(layer => {
-                    if (layer instanceof L.Marker && layer.isPopupOpen()) {
-                        layer.setPopupContent(generatePopupContent(layer.weatherData));
-                    }
+                Object.values(countryLayers).forEach(layerGroup => {
+                    layerGroup.eachLayer(marker => {
+                        updateMarkerTooltip(marker);
+                    });
                 });
             });
         });
 
-        // 6. FETCH DATA ONLY WHEN COUNTRY IS CHECKED
+        // 6. FETCH DATA AND BUILD MARKERS
         document.querySelectorAll('.country-toggle').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 const country = e.target.value;
@@ -287,10 +308,8 @@
                             fetch(url)
                                 .then(response => response.json())
                                 .then(data => {
-                                    // Save the raw data directly to the marker
+                                    // Save raw data directly to the marker
                                     const markerData = {
-                                        name: station.name,
-                                        wmo: station.wmo,
                                         temp: data.main.temp,
                                         windSpeed: data.wind.speed,
                                         windDir: data.wind.deg,
@@ -300,14 +319,23 @@
                                     };
 
                                     const marker = L.marker([station.lat, station.lon]);
-                                    marker.weatherData = markerData; // Store it here!
+                                    marker.weatherData = markerData;
 
-                                    // Bind the dynamic function to the popup
-                                    marker.bindPopup(function(layer) {
-                                        return generatePopupContent(layer.weatherData);
+                                    // Simple Popup: Station Name & WMO only
+                                    marker.bindPopup(`<div class="popup-content"><h3>${station.name} (WMO: ${station.wmo})</h3></div>`);
+
+                                    // Attach the on-map label (Permanent Tooltip)
+                                    marker.bindTooltip("", {
+                                        permanent: true,
+                                        direction: 'right', // Forces it to the right side of the pin
+                                        className: 'weather-label',
+                                        offset: [10, 0] // Pushes it slightly away from the center of the pin
                                     });
 
                                     marker.addTo(countryLayers[country]);
+
+                                    // Force the label to update based on current checkboxes the moment it loads
+                                    updateMarkerTooltip(marker);
                                 })
                                 .catch(err => console.error(`Failed to fetch ${station.name}`, err));
                         });
