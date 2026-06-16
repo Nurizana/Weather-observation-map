@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Asian WMO Weather Map</title>
     
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
@@ -21,22 +20,12 @@
             justify-content: center; align-items: center;
         }
         
-        .auth-container {
-            display: flex; gap: 40px; max-width: 800px; width: 100%; justify-content: center;
-        }
-
+        .auth-container { display: flex; gap: 40px; max-width: 800px; width: 100%; justify-content: center; }
         .auth-column { display: flex; flex-direction: column; align-items: center; width: 300px; }
 
-        /* The Arrow Headers */
-        .auth-header {
-            width: 100%; padding: 20px 10px; text-align: center; font-weight: bold;
-            font-size: 16px; border: 1px solid #333;
-        }
-        .arrow-down {
-            width: 0; height: 0; 
-            border-left: 150px solid transparent; border-right: 150px solid transparent;
-            margin-bottom: -1px;
-        }
+        /* Arrow Headers */
+        .auth-header { width: 100%; padding: 20px 10px; text-align: center; font-weight: bold; font-size: 16px; border: 1px solid #333; box-sizing: border-box; }
+        .arrow-down { width: 0; height: 0; border-left: 150px solid transparent; border-right: 150px solid transparent; margin-bottom: -1px; }
 
         /* Yellow Registration Side */
         .reg-header { background-color: #ffd966; }
@@ -48,8 +37,9 @@
         .log-arrow { border-top: 60px solid #6aa84f; }
         .log-box { background-color: #b6d7a8; border: 1px solid #333; width: 100%; padding: 30px 20px; box-sizing: border-box; text-align: center; }
 
-        .auth-input { width: 90%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
-        .auth-btn { padding: 10px 20px; font-weight: bold; cursor: pointer; border: 1px solid #333; border-radius: 4px; margin-top: 10px;}
+        .auth-input { width: 90%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .auth-btn { padding: 10px 20px; font-weight: bold; cursor: pointer; border: 1px solid #333; border-radius: 4px; margin-top: 10px; background: white;}
+        .auth-btn:hover { background: #eee; }
         
         #auth-message { margin-top: 30px; color: white; font-size: 16px; text-align: center; height: 30px; }
 
@@ -62,13 +52,11 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid #ccc;
             display: none; align-items: center; gap: 15px; font-size: 14px; font-weight: bold;
         }
-        #logout-btn {
-            background: #ff4c4c; color: white; border: none; padding: 5px 10px;
-            border-radius: 3px; cursor: pointer; font-weight: bold;
-        }
+        #logout-btn { background: #ff4c4c; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-weight: bold; }
+        #logout-btn:hover { background: #e60000; }
 
         /* ---------------------------------------------------
-           PRINT BLOCKING CSS (For non-admins)
+           PRINT BLOCKING CSS 
            --------------------------------------------------- */
         @media print {
             .no-print { display: none !important; }
@@ -79,13 +67,15 @@
         }
 
         /* ---------------------------------------------------
-           MAP UI CONTROLS (From previous script)
+           MAP UI CONTROLS 
            --------------------------------------------------- */
         .ui-container { position: absolute; top: 15px; right: 15px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
         .custom-btn { background-color: white; color: #333; border: 2px solid #ccc; padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 180px; text-align: left; display: flex; justify-content: space-between; }
+        .custom-btn:hover { background-color: #f4f4f4; }
         .menu-panel { display: none; flex-direction: column; background: white; padding: 12px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid #ccc; width: 250px; max-height: 400px; overflow-y: auto; }
         .menu-panel.narrow { width: 170px; }
         .menu-panel label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+        .menu-separator { border-top: 1px solid #ddd; margin: 8px 0; }
         
         #radar-legend { position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 10px 15px; border-radius: 5px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: none; font-size: 13px; color: #333; width: 180px; }
         .radar-gradient { height: 10px; width: 100%; margin-top: 8px; border-radius: 2px; background: linear-gradient(to right, #00ffff, #0000ff, #00ff00, #ffff00, #ffaa00, #ff0000, #ff00ff); }
@@ -103,17 +93,12 @@
         .time-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         .time-title { font-weight: bold; color: #0056b3; margin-bottom: 2px; }
         .na-text { color: red; font-style: italic; }
-        .menu-separator { border-top: 1px solid #ddd; margin: 8px 0; }
     </style>
 </head>
-<!-- security-lock class ensures printing is hidden by default -->
 <body class="security-lock no-print">
 
-    <!-- 1. SECURITY LOGIN SCREEN -->
     <div id="auth-overlay">
         <div class="auth-container">
-            
-            <!-- Registration Column -->
             <div class="auth-column">
                 <div class="auth-header reg-header">First Time User Registrations</div>
                 <div class="arrow-down reg-arrow"></div>
@@ -123,8 +108,6 @@
                     <button class="auth-btn" onclick="registerUser()">Register</button>
                 </div>
             </div>
-
-            <!-- Login Column -->
             <div class="auth-column">
                 <div class="auth-header log-header">User Log-in</div>
                 <div class="arrow-down log-arrow"></div>
@@ -134,19 +117,15 @@
                     <button class="auth-btn" onclick="loginUser()">Log In</button>
                 </div>
             </div>
-
         </div>
         <div id="auth-message">Please log in or register to view the map.</div>
     </div>
 
-    <!-- 2. LOGGED-IN USER PROFILE -->
     <div id="user-profile" class="no-print">
         <span id="display-username">user@email.com</span>
         <button id="logout-btn" onclick="logoutUser()">Log Out</button>
     </div>
 
-
-    <!-- 3. MAIN MAP UI -->
     <div id="map" class="no-print"></div>
 
     <div id="radar-legend" class="no-print">
@@ -157,7 +136,6 @@
     </div>
 
     <div class="ui-container no-print">
-        <!-- Base Map Control -->
         <div>
             <button class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
             <div id="menu-basemap" class="menu-panel narrow">
@@ -173,7 +151,6 @@
             </div>
         </div>
 
-        <!-- Country List Control -->
         <div>
             <button class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
             <div id="menu-country" class="menu-panel narrow">
@@ -193,7 +170,6 @@
             </div>
         </div>
 
-        <!-- Parameters & Time Control -->
         <div>
             <button class="custom-btn" onclick="toggleMenu('menu-params')">Hourly Parameters <span>▼</span></button>
             <div id="menu-params" class="menu-panel">
@@ -218,25 +194,23 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
         // =====================================================================
-        // FIREBASE CONFIGURATION (PASTE YOUR KEYS HERE FROM FIREBASE CONSOLE)
+        // FIREBASE CONFIGURATION 
         // =====================================================================
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY_HERE",
-            authDomain: "weather-dashboard.firebaseapp.com", // Example
-            projectId: "weather-dashboard",                  // Example
-            storageBucket: "weather-dashboard.appspot.com",  // Example
-            messagingSenderId: "123456789",                  // Example
-            appId: "1:12345:web:12345"                       // Example
+            apiKey: "AIzaSyD6iBOkYgAC4z0_WD4jiAu9Gd-MiZzGSeY",
+            authDomain: "weathermap-e3f8f.firebaseapp.com",
+            projectId: "weathermap-e3f8f",
+            storageBucket: "weathermap-e3f8f.firebasestorage.app",
+            messagingSenderId: "968790622011",
+            appId: "1:968790622011:web:d0fa73ab4e9b8c9ff4011e"
         };
-        // Initialize Firebase
+        
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
         const auth = firebase.auth();
 
@@ -246,42 +220,35 @@
         const msgBox = document.getElementById('auth-message');
         const adminEmail = "nuriaziz2021@gmail.com";
 
-        // Listen for Auth State Changes
         auth.onAuthStateChanged(user => {
             if (user) {
-                // If they registered but haven't clicked the link in their email yet
+                // Email Verification Check
                 if (!user.emailVerified && user.email !== adminEmail) {
                     msgBox.innerHTML = `Please check your email (${user.email}) and click the verification link before logging in.`;
                     auth.signOut();
                     return;
                 }
                 
-                // User is verified and logged in!
                 document.getElementById('auth-overlay').style.display = 'none';
                 document.getElementById('user-profile').style.display = 'flex';
                 document.getElementById('display-username').textContent = user.email;
-                document.body.classList.remove('no-print'); // Remove total blindfold
+                document.body.classList.remove('no-print'); 
 
-                // ADMIN CHECK
+                // Admin vs Regular User Security
                 if (user.email === adminEmail) {
-                    // Admin: Remove printing and screenshot blocks
                     document.body.classList.remove('security-lock');
                     document.removeEventListener('keyup', screenshotBlocker);
                 } else {
-                    // Normal User: Ensure blocks are active
                     document.body.classList.add('security-lock');
                     document.addEventListener('keyup', screenshotBlocker);
                 }
-                
             } else {
-                // Not logged in
                 document.getElementById('auth-overlay').style.display = 'flex';
                 document.getElementById('user-profile').style.display = 'none';
                 document.body.classList.add('security-lock', 'no-print');
             }
         });
 
-        // Register Function
         function registerUser() {
             const email = document.getElementById('reg-email').value;
             const pass = document.getElementById('reg-pass').value;
@@ -289,16 +256,14 @@
             
             auth.createUserWithEmailAndPassword(email, pass)
                 .then((userCredential) => {
-                    // Send Email Verification
                     userCredential.user.sendEmailVerification().then(() => {
                         msgBox.innerHTML = `Success! A verification link has been sent to <b>${email}</b>. Please verify your email before logging in.`;
-                        auth.signOut(); // Force them out until they verify
+                        auth.signOut(); 
                     });
                 })
                 .catch((error) => { msgBox.textContent = "Error: " + error.message; });
         }
 
-        // Login Function
         function loginUser() {
             const email = document.getElementById('log-email').value;
             const pass = document.getElementById('log-pass').value;
@@ -308,7 +273,6 @@
                 .catch((error) => { msgBox.textContent = "Login Failed: " + error.message; });
         }
 
-        // Logout Function
         function logoutUser() {
             auth.signOut().then(() => {
                 document.getElementById('log-email').value = "";
@@ -317,8 +281,6 @@
             });
         }
 
-        // Screenshot Blocker (Clears clipboard if PrintScreen is pressed)
-        // Note: Browsers cannot 100% stop screenshots, but this clears the clipboard.
         function screenshotBlocker(e) {
             if (e.key === 'PrintScreen') {
                 navigator.clipboard.writeText('Screenshots disabled for security.');
@@ -328,7 +290,7 @@
 
 
         // =====================================================================
-        // MAP LOGIC (All exactly as previous)
+        // MAP LOGIC
         // =====================================================================
         const map = L.map('map', { zoomControl: false }).setView([10.0, 110.0], 4);
         L.control.zoom({ position: 'topleft' }).addTo(map);
@@ -340,12 +302,8 @@
         };
         basemaps.night.addTo(map);
 
-        const gridLayer = L.layerGroup();
-        const countryLayer = L.layerGroup();
-        const myStateLayer = L.layerGroup();
-        let radarLayer = null;
-        let countriesLoaded = false;
-        let myStatesLoaded = false;
+        const gridLayer = L.layerGroup(); const countryLayer = L.layerGroup(); const myStateLayer = L.layerGroup();
+        let radarLayer = null; let countriesLoaded = false; let myStatesLoaded = false;
 
         for (let lat = -90; lat <= 90; lat += 5) L.polyline([[lat, -180], [lat, 180]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
         for (let lon = -180; lon <= 180; lon += 5) L.polyline([[-90, lon], [90, lon]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
@@ -360,7 +318,7 @@
                         .then(res => res.json()).then(data => { L.geoJSON(data, { style: { color: '#aaaaaa', weight: 1.5, fillOpacity: 0, interactive: false } }).addTo(countryLayer); });
                     countriesLoaded = true;
                 }
-            } else { map.removeLayer(countryLayer); }
+            } else map.removeLayer(countryLayer);
         });
 
         document.getElementById('toggle-my-states').addEventListener('change', (e) => {
@@ -371,27 +329,20 @@
                         .then(res => res.json()).then(data => { L.geoJSON(data, { style: { color: '#00ccff', weight: 1.5, dashArray: '4', fillOpacity: 0, interactive: false } }).addTo(myStateLayer); });
                     myStatesLoaded = true;
                 }
-            } else { map.removeLayer(myStateLayer); }
+            } else map.removeLayer(myStateLayer);
         });
 
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('radar-legend');
             if (e.target.checked) {
-                legendDiv.style.display = 'block';
-                document.getElementById('radar-time').textContent = "Fetching radar...";
-                fetch('https://api.rainviewer.com/public/weather-maps.json')
-                    .then(res => res.json())
-                    .then(data => {
-                        const latestScan = data.radar.past[data.radar.past.length - 1];
-                        const dateObj = new Date(latestScan.time * 1000);
-                        document.getElementById('radar-time').innerHTML = `${dateObj.toISOString().split('T')[0]} <br> ${dateObj.toISOString().split('T')[1].substring(0, 5)}z`;
-                        if (radarLayer) map.removeLayer(radarLayer);
-                        radarLayer = L.tileLayer(`${data.host}${latestScan.path}/256/{z}/{x}/{y}/2/1_1.png`, { opacity: 0.65, zIndex: 10 }).addTo(map);
-                    }).catch(err => document.getElementById('radar-time').textContent = "Error");
-            } else {
-                legendDiv.style.display = 'none';
-                if (radarLayer) map.removeLayer(radarLayer);
-            }
+                legendDiv.style.display = 'block'; document.getElementById('radar-time').textContent = "Fetching radar...";
+                fetch('https://api.rainviewer.com/public/weather-maps.json').then(res => res.json()).then(data => {
+                    const latestScan = data.radar.past[data.radar.past.length - 1]; const dateObj = new Date(latestScan.time * 1000);
+                    document.getElementById('radar-time').innerHTML = `${dateObj.toISOString().split('T')[0]} <br> ${dateObj.toISOString().split('T')[1].substring(0, 5)}z`;
+                    if (radarLayer) map.removeLayer(radarLayer);
+                    radarLayer = L.tileLayer(`${data.host}${latestScan.path}/256/{z}/{x}/{y}/2/1_1.png`, { opacity: 0.65, zIndex: 10 }).addTo(map);
+                }).catch(() => document.getElementById('radar-time').textContent = "Error");
+            } else { legendDiv.style.display = 'none'; if (radarLayer) map.removeLayer(radarLayer); }
         });
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
@@ -420,7 +371,10 @@
                 el.style.display = (id === menuId && el.style.display !== 'flex') ? 'flex' : 'none';
             });
         }
-        document.querySelectorAll('input[name="basemap"]').forEach(r => { r.addEventListener('change', (e) => { Object.values(basemaps).forEach(l => map.removeLayer(l)); basemaps[e.target.value].addTo(map); }); });
+
+        document.querySelectorAll('input[name="basemap"]').forEach(r => { 
+            r.addEventListener('change', (e) => { Object.values(basemaps).forEach(l => map.removeLayer(l)); basemaps[e.target.value].addTo(map); }); 
+        });
 
         const timelineData = {}; const timelineKeys = []; let selectedHours = [];  
         const now = new Date();
