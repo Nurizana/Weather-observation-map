@@ -17,6 +17,23 @@
             display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
         }
 
+        /* Radar Legend Container (Bottom Left) */
+        #radar-legend {
+            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.95); padding: 10px 15px;
+            border-radius: 5px; border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: none;
+            font-size: 13px; color: #333; width: 180px;
+        }
+        .radar-gradient {
+            height: 10px; width: 100%; margin-top: 8px; border-radius: 2px;
+            /* RainViewer Default Color Scheme 2 Approximation */
+            background: linear-gradient(to right, #00ffff, #0000ff, #00ff00, #ffff00, #ffaa00, #ff0000, #ff00ff);
+        }
+        .radar-labels {
+            display: flex; justify-content: space-between; font-size: 10px; margin-top: 3px; font-weight: bold; color: #555;
+        }
+
         /* Buttons */
         .custom-btn {
             background-color: white; color: #333; border: 2px solid #ccc;
@@ -32,9 +49,7 @@
             border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid #ccc;
             width: 250px; max-height: 400px; overflow-y: auto;
         }
-        
         .menu-panel.narrow { width: 170px; }
-        
         .menu-panel label {
             display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
             font-size: 14px; cursor: pointer; white-space: nowrap; 
@@ -42,8 +57,7 @@
         
         /* Time Section Styling */
         .time-control-container {
-            display: flex; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px;
-            gap: 10px;
+            display: flex; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px; gap: 10px;
         }
         .date-section { flex: 1; }
         .hour-section {
@@ -51,7 +65,6 @@
             max-height: 120px; overflow-y: auto; background: #f9f9f9;
         }
         .time-header { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; }
-        
         .hour-checkbox-wrapper { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; font-size: 12px; }
 
         /* Popups and Tooltips */
@@ -74,6 +87,16 @@
 
     <div id="map"></div>
 
+    <div id="radar-legend">
+        <strong style="color:#0056b3;">Live Radar Scans</strong><br>
+        <div id="radar-time" style="font-weight: bold; margin-top: 4px;">Loading time...</div>
+        <div class="radar-gradient"></div>
+        <div class="radar-labels">
+            <span>Light</span>
+            <span>Heavy</span>
+        </div>
+    </div>
+
     <div class="ui-container">
         
         <div>
@@ -86,6 +109,7 @@
                 <div class="menu-separator"></div>
                 <div style="font-size: 11px; color:#777; margin-bottom: 5px;">OVERLAYS</div>
                 
+                <label><input type="checkbox" id="toggle-radar"> Live Radar</label>
                 <label><input type="checkbox" id="toggle-grid"> 5 Degree Grid</label>
                 <label><input type="checkbox" id="toggle-country-bounds"> Country Borders</label>
                 <label><input type="checkbox" id="toggle-my-states"> Malaysia States</label>
@@ -95,6 +119,8 @@
         <div>
             <button class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
             <div id="menu-country" class="menu-panel narrow">
+                <label><input type="checkbox" class="country-toggle" value="China"> China (20)</label>
+                <label><input type="checkbox" class="country-toggle" value="Taiwan"> Taiwan (3)</label>
                 <label><input type="checkbox" class="country-toggle" value="Myanmar"> Myanmar (3)</label>
                 <label><input type="checkbox" class="country-toggle" value="Laos"> Laos (3)</label>
                 <label><input type="checkbox" class="country-toggle" value="Thailand"> Thailand (5)</label>
@@ -106,8 +132,6 @@
                 <label><input type="checkbox" class="country-toggle" value="Philippines"> Philippines (20)</label>
                 <label><input type="checkbox" class="country-toggle" value="Brunei"> Brunei (2)</label>
                 <label><input type="checkbox" class="country-toggle" value="TimorLeste"> Timor-Leste (2)</label>
-                <label><input type="checkbox" class="country-toggle" value="China"> China (20)</label>
-                <label><input type="checkbox" class="country-toggle" value="Taiwan"> Taiwan (3)</label>
             </div>
         </div>
 
@@ -155,16 +179,17 @@
         basemaps.night.addTo(map);
 
         // ---------------------------------------------------------
-        // 2. OVERLAY LAYERS (Grid & Boundaries)
+        // 2. OVERLAY LAYERS (Grid, Boundaries, RADAR)
         // ---------------------------------------------------------
         const gridLayer = L.layerGroup();
         const countryLayer = L.layerGroup();
         const myStateLayer = L.layerGroup();
+        let radarLayer = null;
         
         let countriesLoaded = false;
         let myStatesLoaded = false;
 
-        // Generate the 5-Degree Grid mathematically
+        // 5-Degree Grid
         for (let lat = -90; lat <= 90; lat += 5) {
             L.polyline([[lat, -180], [lat, 180]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
         }
@@ -172,49 +197,81 @@
             L.polyline([[-90, lon], [90, lon]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
         }
 
-        // Toggle Grid
-        document.getElementById('toggle-grid').addEventListener('change', (e) => {
-            e.target.checked ? gridLayer.addTo(map) : map.removeLayer(gridLayer);
-        });
+        document.getElementById('toggle-grid').addEventListener('change', (e) => e.target.checked ? gridLayer.addTo(map) : map.removeLayer(gridLayer));
 
-        // Toggle Country Boundaries (Fetches GeoJSON on first click)
+        // Country Boundaries
         document.getElementById('toggle-country-bounds').addEventListener('change', (e) => {
             if (e.target.checked) {
                 countryLayer.addTo(map);
                 if (!countriesLoaded) {
                     fetch('https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson')
                         .then(res => res.json())
-                        .then(data => {
-                            L.geoJSON(data, { style: { color: '#aaaaaa', weight: 1.5, fillOpacity: 0, interactive: false } }).addTo(countryLayer);
-                        }).catch(err => console.error("Could not load country bounds", err));
+                        .then(data => { L.geoJSON(data, { style: { color: '#aaaaaa', weight: 1.5, fillOpacity: 0, interactive: false } }).addTo(countryLayer); })
                     countriesLoaded = true;
                 }
-            } else {
-                map.removeLayer(countryLayer);
-            }
+            } else { map.removeLayer(countryLayer); }
         });
 
-        // Toggle Malaysia State Boundaries (Fetches GeoJSON on first click)
+        // Malaysia State Boundaries
         document.getElementById('toggle-my-states').addEventListener('change', (e) => {
             if (e.target.checked) {
                 myStateLayer.addTo(map);
                 if (!myStatesLoaded) {
                     fetch('https://raw.githubusercontent.com/nullifye/malaysia.geojson/master/malaysia.state.geojson')
                         .then(res => res.json())
-                        .then(data => {
-                            L.geoJSON(data, { style: { color: '#00ccff', weight: 1.5, dashArray: '4', fillOpacity: 0, interactive: false } }).addTo(myStateLayer);
-                        }).catch(err => console.error("Could not load Malaysia state bounds", err));
+                        .then(data => { L.geoJSON(data, { style: { color: '#00ccff', weight: 1.5, dashArray: '4', fillOpacity: 0, interactive: false } }).addTo(myStateLayer); })
                     myStatesLoaded = true;
                 }
+            } else { map.removeLayer(myStateLayer); }
+        });
+
+        // LIVE RADAR LOGIC (RainViewer API)
+        document.getElementById('toggle-radar').addEventListener('change', (e) => {
+            const legendDiv = document.getElementById('radar-legend');
+            if (e.target.checked) {
+                legendDiv.style.display = 'block';
+                document.getElementById('radar-time').textContent = "Fetching radar...";
+                
+                // Fetch the latest radar timestamp and tile path
+                fetch('https://api.rainviewer.com/public/weather-maps.json')
+                    .then(res => res.json())
+                    .then(data => {
+                        const pastRadar = data.radar.past;
+                        const latestScan = pastRadar[pastRadar.length - 1]; // Get the most recent scan
+                        
+                        // Convert UNIX timestamp to UTC Date String
+                        const dateObj = new Date(latestScan.time * 1000);
+                        const dateString = dateObj.toISOString().split('T')[0];
+                        const timeString = dateObj.toISOString().split('T')[1].substring(0, 5) + 'z';
+                        
+                        document.getElementById('radar-time').innerHTML = `${dateString} <br> ${timeString}`;
+                        
+                        // Build the tile URL: 2 = color scheme, 1_1 = 512px tile size
+                        const tileUrl = `${data.host}${latestScan.path}/256/{z}/{x}/{y}/2/1_1.png`;
+                        
+                        // If a radar layer already exists, remove it before adding the new one
+                        if (radarLayer) { map.removeLayer(radarLayer); }
+                        
+                        radarLayer = L.tileLayer(tileUrl, { opacity: 0.65, zIndex: 10 });
+                        radarLayer.addTo(map);
+                    })
+                    .catch(err => {
+                        console.error("Radar fetch error:", err);
+                        document.getElementById('radar-time').textContent = "Error loading data.";
+                    });
             } else {
-                map.removeLayer(myStateLayer);
+                legendDiv.style.display = 'none';
+                if (radarLayer) { map.removeLayer(radarLayer); }
             }
         });
+
 
         // ---------------------------------------------------------
         // 3. STATION DATA
         // ---------------------------------------------------------
         const stationData = {
+            "China": [{ name: "Beijing", wmo: "54511", lat: 40.08, lon: 116.58 }, { name: "Shanghai", wmo: "58362", lat: 31.14, lon: 121.80 }, { name: "Guangzhou", wmo: "59287", lat: 23.39, lon: 113.29 }, { name: "Shenzhen", wmo: "59493", lat: 22.63, lon: 113.81 }, { name: "Chengdu", wmo: "56294", lat: 30.57, lon: 103.95 }, { name: "Chongqing", wmo: "57516", lat: 29.71, lon: 106.64 }, { name: "Xi'an", wmo: "57036", lat: 34.44, lon: 108.75 }, { name: "Kunming", wmo: "56778", lat: 25.10, lon: 102.93 }, { name: "Hangzhou", wmo: "58457", lat: 30.22, lon: 120.43 }, { name: "Nanjing", wmo: "58238", lat: 31.74, lon: 118.86 }, { name: "Wuhan", wmo: "57494", lat: 30.78, lon: 114.20 }, { name: "Zhengzhou", wmo: "57083", lat: 34.52, lon: 113.84 }, { name: "Changsha", wmo: "57687", lat: 28.19, lon: 113.21 }, { name: "Qingdao", wmo: "54857", lat: 36.26, lon: 120.01 }, { name: "Xiamen", wmo: "59134", lat: 24.54, lon: 118.12 }, { name: "Haikou", wmo: "59758", lat: 20.05, lon: 110.45 }, { name: "Sanya", wmo: "59948", lat: 18.30, lon: 109.41 }, { name: "Guiyang", wmo: "57816", lat: 26.53, lon: 106.80 }, { name: "Nanning", wmo: "59431", lat: 22.60, lon: 108.17 }, { name: "Fuzhou", wmo: "58847", lat: 25.93, lon: 119.66 }],
+            "Taiwan": [{ name: "Taipei", wmo: "46692", lat: 25.08, lon: 121.23 }, { name: "Kaohsiung", wmo: "46744", lat: 22.57, lon: 120.34 }, { name: "Taichung", wmo: "46749", lat: 24.26, lon: 120.62 }],
             "Myanmar": [{ name: "Yangon", wmo: "48097", lat: 16.79, lon: 96.15 }, { name: "Mandalay", wmo: "48042", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48060", lat: 19.75, lon: 96.10 }],
             "Laos": [{ name: "Vientiane", wmo: "48940", lat: 17.97, lon: 102.56 }, { name: "Luang Prabang", wmo: "48930", lat: 19.88, lon: 102.13 }, { name: "Pakse", wmo: "48955", lat: 15.12, lon: 105.78 }],
             "Thailand": [{ name: "Bangkok", wmo: "48455", lat: 13.75, lon: 100.50 }, { name: "Chiang Mai", wmo: "48327", lat: 18.78, lon: 98.98 }, { name: "Phuket", wmo: "48564", lat: 7.88, lon: 98.39 }, { name: "Khon Kaen", wmo: "48431", lat: 16.43, lon: 102.82 }, { name: "Hat Yai", wmo: "48568", lat: 7.00, lon: 100.46 }],
@@ -225,9 +282,7 @@
             "Indonesia": [{ name: "Jakarta", wmo: "96749", lat: -6.12, lon: 106.65 }, { name: "Bandung", wmo: "96773", lat: -6.90, lon: 107.57 }, { name: "Surabaya", wmo: "96935", lat: -7.37, lon: 112.78 }, { name: "Yogyakarta", wmo: "96805", lat: -7.87, lon: 110.43 }, { name: "Semarang", wmo: "96839", lat: -6.98, lon: 110.37 }, { name: "Medan", wmo: "96035", lat: 3.63, lon: 98.88 }, { name: "Padang", wmo: "96163", lat: -0.88, lon: 100.32 }, { name: "Palembang", wmo: "96221", lat: -2.89, lon: 104.70 }, { name: "Pekanbaru", wmo: "96109", lat: 0.46, lon: 101.44 }, { name: "Batam", wmo: "96171", lat: 1.12, lon: 104.11 }, { name: "Denpasar", wmo: "97230", lat: -8.74, lon: 115.16 }, { name: "Lombok", wmo: "97240", lat: -8.75, lon: 116.27 }, { name: "Kupang", wmo: "97372", lat: -10.17, lon: 123.67 }, { name: "Pontianak", wmo: "96565", lat: -0.05, lon: 109.40 }, { name: "Balikpapan", wmo: "96633", lat: -1.26, lon: 116.89 }, { name: "Samarinda", wmo: "96607", lat: -0.48, lon: 117.15 }, { name: "Banjarmasin", wmo: "96685", lat: -3.44, lon: 114.75 }, { name: "Makassar", wmo: "97180", lat: -5.06, lon: 119.55 }, { name: "Manado", wmo: "97014", lat: 1.53, lon: 124.92 }, { name: "Ambon", wmo: "97300", lat: -3.70, lon: 128.18 }],
             "Philippines": [{ name: "Manila", wmo: "98429", lat: 14.51, lon: 121.01 }, { name: "Clark", wmo: "98327", lat: 15.18, lon: 120.55 }, { name: "Subic", wmo: "98426", lat: 14.79, lon: 120.27 }, { name: "Laoag", wmo: "98223", lat: 18.17, lon: 120.53 }, { name: "Tuguegarao", wmo: "98233", lat: 17.63, lon: 121.73 }, { name: "Baguio", wmo: "98328", lat: 16.37, lon: 120.62 }, { name: "Legazpi", wmo: "98444", lat: 13.15, lon: 123.73 }, { name: "Puerto Princesa", wmo: "98618", lat: 9.73, lon: 118.75 }, { name: "Iloilo", wmo: "98637", lat: 10.83, lon: 122.53 }, { name: "Bacolod", wmo: "98630", lat: 10.77, lon: 123.01 }, { name: "Cebu", wmo: "98646", lat: 10.31, lon: 123.97 }, { name: "Tagbilaran", wmo: "98644", lat: 9.66, lon: 123.85 }, { name: "Tacloban", wmo: "98550", lat: 11.22, lon: 125.02 }, { name: "Zamboanga", wmo: "98836", lat: 6.92, lon: 122.06 }, { name: "Davao", wmo: "98753", lat: 7.12, lon: 125.64 }, { name: "General Santos", wmo: "98755", lat: 6.06, lon: 125.09 }, { name: "Cotabato", wmo: "98746", lat: 7.16, lon: 124.21 }, { name: "Cagayan de Oro", wmo: "98748", lat: 8.41, lon: 124.61 }, { name: "Butuan", wmo: "98752", lat: 8.95, lon: 125.47 }, { name: "Surigao", wmo: "98543", lat: 9.79, lon: 125.48 }],
             "Brunei": [{ name: "Brunei Int", wmo: "96315", lat: 4.94, lon: 114.93 }, { name: "Seria", wmo: "96311", lat: 4.60, lon: 114.31 }],
-            "TimorLeste": [{ name: "Dili", wmo: "97390", lat: -8.55, lon: 125.52 }, { name: "Baucau", wmo: "97392", lat: -8.48, lon: 126.39 }],
-            "China": [{ name: "Beijing", wmo: "54511", lat: 40.08, lon: 116.58 }, { name: "Shanghai", wmo: "58362", lat: 31.14, lon: 121.80 }, { name: "Guangzhou", wmo: "59287", lat: 23.39, lon: 113.29 }, { name: "Shenzhen", wmo: "59493", lat: 22.63, lon: 113.81 }, { name: "Chengdu", wmo: "56294", lat: 30.57, lon: 103.95 }, { name: "Chongqing", wmo: "57516", lat: 29.71, lon: 106.64 }, { name: "Xi'an", wmo: "57036", lat: 34.44, lon: 108.75 }, { name: "Kunming", wmo: "56778", lat: 25.10, lon: 102.93 }, { name: "Hangzhou", wmo: "58457", lat: 30.22, lon: 120.43 }, { name: "Nanjing", wmo: "58238", lat: 31.74, lon: 118.86 }, { name: "Wuhan", wmo: "57494", lat: 30.78, lon: 114.20 }, { name: "Zhengzhou", wmo: "57083", lat: 34.52, lon: 113.84 }, { name: "Changsha", wmo: "57687", lat: 28.19, lon: 113.21 }, { name: "Qingdao", wmo: "54857", lat: 36.26, lon: 120.01 }, { name: "Xiamen", wmo: "59134", lat: 24.54, lon: 118.12 }, { name: "Haikou", wmo: "59758", lat: 20.05, lon: 110.45 }, { name: "Sanya", wmo: "59948", lat: 18.30, lon: 109.41 }, { name: "Guiyang", wmo: "57816", lat: 26.53, lon: 106.80 }, { name: "Nanning", wmo: "59431", lat: 22.60, lon: 108.17 }, { name: "Fuzhou", wmo: "58847", lat: 25.93, lon: 119.66 }],
-            "Taiwan": [{ name: "Taipei", wmo: "46692", lat: 25.08, lon: 121.23 }, { name: "Kaohsiung", wmo: "46744", lat: 22.57, lon: 120.34 }, { name: "Taichung", wmo: "46749", lat: 24.26, lon: 120.62 }]
+            "TimorLeste": [{ name: "Dili", wmo: "97390", lat: -8.55, lon: 125.52 }, { name: "Baucau", wmo: "97392", lat: -8.48, lon: 126.39 }]
         };
 
         const countryStationLayers = {};
