@@ -16,7 +16,7 @@
         #map { 
             width: 100vw; 
             height: 100vh; 
-            z-index: 1; /* Keep map behind UI */
+            z-index: 1; 
         }
         
         /* Custom UI Container */
@@ -24,7 +24,7 @@
             position: absolute;
             top: 15px;
             right: 15px;
-            z-index: 1000; /* Keep UI above map */
+            z-index: 1000; 
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -77,7 +77,7 @@
             margin-bottom: 0;
         }
 
-        /* Simple Popup Styling (Name & WMO Only) */
+        /* Simple Popup Styling */
         .popup-content h3 { 
             margin: 0; 
             font-size: 15px;
@@ -257,7 +257,6 @@
         });
 
         // 5. ON-MAP DISPLAY (TOOLTIPS) LOGIC
-        // This function formats the text string for the map label based on checkboxes
         function updateMarkerTooltip(marker) {
             if (!marker.weatherData) return;
             let parts = [];
@@ -271,18 +270,14 @@
 
             const labelText = parts.join('<br>');
             
-            // Set the generated text
             marker.setTooltipContent(labelText);
 
-            // Access the actual HTML container of the Leaflet tooltip to hide/show it safely
             const tooltipElement = marker.getTooltip()._container;
             if (tooltipElement) {
-                // If text is empty (no params checked), hide the box. Otherwise, show it.
                 tooltipElement.style.display = labelText.length > 0 ? 'block' : 'none';
             }
         }
 
-        // Triggers the update on every marker on the map when a parameter is checked/unchecked
         document.querySelectorAll('.param-toggle').forEach(checkbox => {
             checkbox.addEventListener('change', () => {
                 Object.values(countryLayers).forEach(layerGroup => {
@@ -293,7 +288,7 @@
             });
         });
 
-        // 6. FETCH DATA AND BUILD MARKERS
+        // 6. FETCH DATA AND BUILD MARKERS (UPDATED TO USE SMALL CIRCLES)
         document.querySelectorAll('.country-toggle').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 const country = e.target.value;
@@ -308,7 +303,6 @@
                             fetch(url)
                                 .then(response => response.json())
                                 .then(data => {
-                                    // Save raw data directly to the marker
                                     const markerData = {
                                         temp: data.main.temp,
                                         windSpeed: data.wind.speed,
@@ -318,23 +312,30 @@
                                         rainfall: (data.rain && data.rain['1h']) ? data.rain['1h'] : 0
                                     };
 
-                                    const marker = L.marker([station.lat, station.lon]);
+                                    // Replace L.marker with L.circleMarker for a clean, small dot
+                                    const marker = L.circleMarker([station.lat, station.lon], {
+                                        radius: 5,               // Small size
+                                        fillColor: "#3388ff",    // Leaflet Blue
+                                        color: "#ffffff",        // Crisp white border
+                                        weight: 1.5,             // Border thickness
+                                        opacity: 1,
+                                        fillOpacity: 0.9
+                                    });
+
                                     marker.weatherData = markerData;
 
-                                    // Simple Popup: Station Name & WMO only
+                                    // Simple Popup
                                     marker.bindPopup(`<div class="popup-content"><h3>${station.name} (WMO: ${station.wmo})</h3></div>`);
 
-                                    // Attach the on-map label (Permanent Tooltip)
+                                    // Attach the on-map label
                                     marker.bindTooltip("", {
                                         permanent: true,
-                                        direction: 'right', // Forces it to the right side of the pin
+                                        direction: 'right', 
                                         className: 'weather-label',
-                                        offset: [10, 0] // Pushes it slightly away from the center of the pin
+                                        offset: [8, 0] // Adjusted offset so text sits right next to the small circle
                                     });
 
                                     marker.addTo(countryLayers[country]);
-
-                                    // Force the label to update based on current checkboxes the moment it loads
                                     updateMarkerTooltip(marker);
                                 })
                                 .catch(err => console.error(`Failed to fetch ${station.name}`, err));
