@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMO Network Weather Map</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+        }
+        #map { 
+            width: 100vw; 
+            height: 100vh; 
+        }
+        /* Styling for the popup data box */
+        .popup-content { 
+            font-family: Arial, sans-serif; 
+            font-size: 14px; 
+        }
+        .popup-content h3 { 
+            margin: 0 0 5px 0; 
+            border-bottom: 1px solid #ccc; 
+            padding-bottom: 5px; 
+        }
+        .popup-content p { 
+            margin: 4px 0; 
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // ---------------------------------------------------------
+        // 1. INITIALIZE THE MAP
+        // ---------------------------------------------------------
+        // Set the map view to a zoomed-out global perspective
+        const map = L.map('map').setView([20.0, 0.0], 2);
+
+        // ---------------------------------------------------------
+        // 2. DEFINE BASEMAP LAYERS
+        // ---------------------------------------------------------
+        const esriOcean = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 13
+        });
+
+        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        });
+
+        const nightMode = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap & CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        // Set Night Mode as the default
+        nightMode.addTo(map);
+
+        // ---------------------------------------------------------
+        // 3. WMO STATION DATA & API SETUP
+        // ---------------------------------------------------------
+        // Create a layer group to hold all the markers
+        const wmoLayer = L.layerGroup().addTo(map);
+        
+        // Your specific OpenWeatherMap API Key
+        const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
+
+        // An array of prominent global WMO meteorological stations.
+        // You can add more stations here following the exact same format.
+        const wmoStations = [
+            { name: "London Heathrow, UK (WMO: 03772)", lat: 51.47, lon: -0.45 },
+            { name: "New York JFK, USA (WMO: 74486)", lat: 40.64, lon: -73.78 },
+            { name: "Tokyo Haneda, Japan (WMO: 47662)", lat: 35.55, lon: 139.78 },
+            { name: "Sydney Airport, AUS (WMO: 94767)", lat: -33.95, lon: 151.18 },
+            { name: "Cape Town, RSA (WMO: 68816)", lat: -33.97, lon: 18.60 },
+            { name: "Sepang KLIA, Malaysia (WMO: 48647)", lat: 2.75, lon: 101.70 },
+            { name: "Paris CDG, FRA (WMO: 07157)", lat: 49.01, lon: 2.53 },
+            { name: "Beijing Capital, CHN (WMO: 54511)", lat: 40.08, lon: 116.58 },
+            { name: "Dubai Int, UAE (WMO: 41194)", lat: 25.25, lon: 55.36 },
+            { name: "São Paulo, BRA (WMO: 83779)", lat: -23.43, lon: -46.47 }
+        ];
+
+        // ---------------------------------------------------------
+        // 4. FETCH WEATHER DATA AND PLOT POINTS
+        // ---------------------------------------------------------
+        // Loop through each station in the array above
+        wmoStations.forEach(station => {
+            // Build the API URL for this specific coordinate, asking for Metric units
+            const url = `https://api.openweathermap.org/data/2.5/weather?lat=${station.lat}&lon=${station.lon}&appid=${apiKey}&units=metric`;
+
+            // Call the API
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    // Extract the required variables
+                    const temp = data.main.temp;
+                    const pressure = data.main.pressure;
+                    const humidity = data.main.humidity;
+                    const windSpeed = data.wind.speed;
+                    const windDir = data.wind.deg;
+                    
+                    // Rainfall data only appears in the API if it is currently raining. 
+                    // This checks if rain data exists; if not, it defaults to 0.
+                    const rainfall = (data.rain && data.rain['1h']) ? data.rain['1h'] : 0;
+
+                    // Format the HTML inside the popup marker
+                    const popupContent = `
+                        <div class="popup-content">
+                            <h3>${station.name}</h3>
+                            <p><strong>Temperature:</strong> ${temp} °C</p>
+                            <p><strong>Wind:</strong> ${windSpeed} m/s at ${windDir}&deg;</p>
+                            <p><strong>Humidity:</strong> ${humidity}%</p>
+                            <p><strong>Pressure:</strong> ${pressure} hPa</p>
+                            <p><strong>Rainfall (last 1h):</strong> ${rainfall} mm</p>
+                        </div>
+                    `;
+
+                    // Create the marker, attach the popup, and add it to our layer group
+                    L.marker([station.lat, station.lon])
+                        .bindPopup(popupContent)
+                        .addTo(wmoLayer);
+                })
+                .catch(error => console.error(`Error fetching data for ${station.name}:`, error));
+        });
+
+        // ---------------------------------------------------------
+        // 5. ADD LAYER CONTROLS (MENU)
+        // ---------------------------------------------------------
+        const baseMaps = {
+            "Night Mode": nightMode,
+            "ESRI Blue Ocean": esriOcean,
+            "Satellite": satellite
+        };
+
+        const overlayMaps = {
+            "WMO Stations": wmoLayer
+        };
+
+        // Add the toggle menu to the top right of the map
+        L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+    </script>
+</body>
+</html>
