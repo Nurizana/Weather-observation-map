@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WMO Network Weather Map</title>
+    <title>SE Asia Weather Map</title>
     
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
@@ -16,7 +17,6 @@
             width: 100vw; 
             height: 100vh; 
         }
-        /* Styling for the popup data box */
         .popup-content { 
             font-family: Arial, sans-serif; 
             font-size: 14px; 
@@ -28,6 +28,10 @@
         }
         .popup-content p { 
             margin: 4px 0; 
+        }
+        /* Adding a little margin to separate the two control boxes */
+        .leaflet-control-layers:first-child {
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -41,8 +45,8 @@
         // ---------------------------------------------------------
         // 1. INITIALIZE THE MAP
         // ---------------------------------------------------------
-        // Set the map view to a zoomed-out global perspective
-        const map = L.map('map').setView([20.0, 0.0], 2);
+        // Centered over Southeast Asia to view all selected countries
+        const map = L.map('map').setView([10.0, 110.0], 4);
 
         // ---------------------------------------------------------
         // 2. DEFINE BASEMAP LAYERS
@@ -62,60 +66,73 @@
             maxZoom: 20
         });
 
-        // Set Night Mode as the default
+        // Set Night Mode as default
         nightMode.addTo(map);
 
         // ---------------------------------------------------------
-        // 3. WMO STATION DATA & API SETUP
+        // 3. CREATE LAYER GROUPS FOR EACH COUNTRY
         // ---------------------------------------------------------
-        // Create a layer group to hold all the markers
-        const wmoLayer = L.layerGroup().addTo(map);
-        
-        // Your specific OpenWeatherMap API Key
-        const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
+        const layers = {
+            "Myanmar": L.layerGroup().addTo(map),
+            "Laos": L.layerGroup().addTo(map),
+            "Thailand": L.layerGroup().addTo(map),
+            "Vietnam": L.layerGroup().addTo(map),
+            "Cambodia": L.layerGroup().addTo(map),
+            "Malaysia": L.layerGroup().addTo(map),
+            "Singapore": L.layerGroup().addTo(map),
+            "Indonesia": L.layerGroup().addTo(map),
+            "Philippines": L.layerGroup().addTo(map),
+            "Brunei": L.layerGroup().addTo(map),
+            "Timor-Leste": L.layerGroup().addTo(map),
+            "China": L.layerGroup().addTo(map),
+            "Taiwan": L.layerGroup().addTo(map)
+        };
 
-        // An array of prominent global WMO meteorological stations.
-        // You can add more stations here following the exact same format.
-        const wmoStations = [
-            { name: "London Heathrow, UK (WMO: 03772)", lat: 51.47, lon: -0.45 },
-            { name: "New York JFK, USA (WMO: 74486)", lat: 40.64, lon: -73.78 },
-            { name: "Tokyo Haneda, Japan (WMO: 47662)", lat: 35.55, lon: 139.78 },
-            { name: "Sydney Airport, AUS (WMO: 94767)", lat: -33.95, lon: 151.18 },
-            { name: "Cape Town, RSA (WMO: 68816)", lat: -33.97, lon: 18.60 },
-            { name: "Sepang KLIA, Malaysia (WMO: 48647)", lat: 2.75, lon: 101.70 },
-            { name: "Paris CDG, FRA (WMO: 07157)", lat: 49.01, lon: 2.53 },
-            { name: "Beijing Capital, CHN (WMO: 54511)", lat: 40.08, lon: 116.58 },
-            { name: "Dubai Int, UAE (WMO: 41194)", lat: 25.25, lon: 55.36 },
-            { name: "São Paulo, BRA (WMO: 83779)", lat: -23.43, lon: -46.47 }
+        // ---------------------------------------------------------
+        // 4. STATION DATA BY COUNTRY
+        // ---------------------------------------------------------
+        // Keeping it lightweight (1-2 major stations per country) to avoid API rate limits.
+        const stations = [
+            { country: "Myanmar", name: "Yangon", lat: 16.90, lon: 96.13 },
+            { country: "Laos", name: "Vientiane", lat: 17.97, lon: 102.56 },
+            { country: "Thailand", name: "Bangkok", lat: 13.68, lon: 100.75 },
+            { country: "Vietnam", name: "Hanoi", lat: 21.22, lon: 105.81 },
+            { country: "Vietnam", name: "Ho Chi Minh City", lat: 10.82, lon: 106.66 },
+            { country: "Cambodia", name: "Phnom Penh", lat: 11.55, lon: 104.84 },
+            { country: "Malaysia", name: "Sepang KLIA", lat: 2.75, lon: 101.70 },
+            { country: "Malaysia", name: "Kuching", lat: 1.48, lon: 110.34 },
+            { country: "Singapore", name: "Changi", lat: 1.36, lon: 103.99 },
+            { country: "Indonesia", name: "Jakarta", lat: -6.13, lon: 106.66 },
+            { country: "Indonesia", name: "Bali", lat: -8.74, lon: 115.16 },
+            { country: "Philippines", name: "Manila", lat: 14.51, lon: 121.01 },
+            { country: "Brunei", name: "Brunei Int Airport", lat: 4.94, lon: 114.93 },
+            { country: "Timor-Leste", name: "Dili", lat: -8.55, lon: 125.52 },
+            { country: "China", name: "Beijing", lat: 40.08, lon: 116.58 },
+            { country: "China", name: "Guangzhou", lat: 23.39, lon: 113.29 },
+            { country: "Taiwan", name: "Taipei", lat: 25.08, lon: 121.23 }
         ];
 
+        const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
+
         // ---------------------------------------------------------
-        // 4. FETCH WEATHER DATA AND PLOT POINTS
+        // 5. FETCH DATA & PLOT MARKERS
         // ---------------------------------------------------------
-        // Loop through each station in the array above
-        wmoStations.forEach(station => {
-            // Build the API URL for this specific coordinate, asking for Metric units
+        stations.forEach(station => {
             const url = `https://api.openweathermap.org/data/2.5/weather?lat=${station.lat}&lon=${station.lon}&appid=${apiKey}&units=metric`;
 
-            // Call the API
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    // Extract the required variables
                     const temp = data.main.temp;
                     const pressure = data.main.pressure;
                     const humidity = data.main.humidity;
                     const windSpeed = data.wind.speed;
                     const windDir = data.wind.deg;
-                    
-                    // Rainfall data only appears in the API if it is currently raining. 
-                    // This checks if rain data exists; if not, it defaults to 0.
                     const rainfall = (data.rain && data.rain['1h']) ? data.rain['1h'] : 0;
 
-                    // Format the HTML inside the popup marker
                     const popupContent = `
                         <div class="popup-content">
-                            <h3>${station.name}</h3>
+                            <h3>${station.name}, ${station.country}</h3>
                             <p><strong>Temperature:</strong> ${temp} °C</p>
                             <p><strong>Wind:</strong> ${windSpeed} m/s at ${windDir}&deg;</p>
                             <p><strong>Humidity:</strong> ${humidity}%</p>
@@ -124,29 +141,30 @@
                         </div>
                     `;
 
-                    // Create the marker, attach the popup, and add it to our layer group
+                    // Add the marker directly to the specific country's layer group
                     L.marker([station.lat, station.lon])
                         .bindPopup(popupContent)
-                        .addTo(wmoLayer);
+                        .addTo(layers[station.country]);
                 })
                 .catch(error => console.error(`Error fetching data for ${station.name}:`, error));
         });
 
         // ---------------------------------------------------------
-        // 5. ADD LAYER CONTROLS (MENU)
+        // 6. ADD SEPARATE LAYER CONTROLS (MENUS)
         // ---------------------------------------------------------
+        
+        // --- CONTROL BOX 1: Base Maps ---
         const baseMaps = {
             "Night Mode": nightMode,
-            "ESRI Blue Ocean": esriOcean,
+            "Blue Ocean": esriOcean,  // Name changed as requested
             "Satellite": satellite
         };
+        // We pass 'null' for overlays here so this box ONLY handles basemaps
+        L.control.layers(baseMaps, null, { collapsed: false }).addTo(map);
 
-        const overlayMaps = {
-            "WMO Stations": wmoLayer
-        };
-
-        // Add the toggle menu to the top right of the map
-        L.control.layers(baseMaps, overlayMaps).addTo(map);
+        // --- CONTROL BOX 2: Country Toggles ---
+        // We pass 'null' for basemaps here so this box ONLY handles overlays (countries)
+        L.control.layers(null, layers, { collapsed: false }).addTo(map);
 
     </script>
 </body>
