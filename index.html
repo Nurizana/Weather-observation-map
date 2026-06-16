@@ -21,7 +21,7 @@
         .custom-btn {
             background-color: white; color: #333; border: 2px solid #ccc;
             padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 5px;
-            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 160px;
+            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 180px;
             text-align: left; display: flex; justify-content: space-between;
         }
         .custom-btn:hover { background-color: #f4f4f4; }
@@ -65,6 +65,9 @@
         .time-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         .time-title { font-weight: bold; color: #0056b3; margin-bottom: 2px; }
         .na-text { color: red; font-style: italic; }
+        
+        /* Separator line for menu */
+        .menu-separator { border-top: 1px solid #ddd; margin: 8px 0; }
     </style>
 </head>
 <body>
@@ -79,6 +82,13 @@
                 <label><input type="radio" name="basemap" value="night" checked> Night Mode</label>
                 <label><input type="radio" name="basemap" value="ocean"> Blue Ocean</label>
                 <label><input type="radio" name="basemap" value="satellite"> Satellite</label>
+                
+                <div class="menu-separator"></div>
+                <div style="font-size: 11px; color:#777; margin-bottom: 5px;">OVERLAYS</div>
+                
+                <label><input type="checkbox" id="toggle-grid"> 5 Degree Grid</label>
+                <label><input type="checkbox" id="toggle-country-bounds"> Country Borders</label>
+                <label><input type="checkbox" id="toggle-my-states"> Malaysia States</label>
             </div>
         </div>
 
@@ -102,7 +112,7 @@
         </div>
 
         <div>
-            <button class="custom-btn" onclick="toggleMenu('menu-params')">Parameters <span>▼</span></button>
+            <button class="custom-btn" onclick="toggleMenu('menu-params')">Hourly Parameters <span>▼</span></button>
             <div id="menu-params" class="menu-panel">
                 <label><input type="checkbox" class="param-toggle" id="param-temp" checked> Temperature</label>
                 <label><input type="checkbox" class="param-toggle" id="param-windspeed"> Wind Speed</label>
@@ -117,7 +127,7 @@
                         <select id="date-select" style="width: 100%; padding: 4px;"></select>
                     </div>
                     <div class="hour-section">
-                        <div class="time-header">Hour (Max 3)</div>
+                        <div class="time-header">24 Hour UTC [Max 3]</div>
                         <div id="hour-list"></div>
                     </div>
                 </div>
@@ -131,7 +141,9 @@
     <script>
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
 
-        // 1. INITIALIZE MAP
+        // ---------------------------------------------------------
+        // 1. INITIALIZE MAP & BASEMAPS
+        // ---------------------------------------------------------
         const map = L.map('map', { zoomControl: false }).setView([10.0, 110.0], 4);
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
@@ -142,7 +154,66 @@
         };
         basemaps.night.addTo(map);
 
-        // 2. STATION DATA (Keeping sample small here for code brevity, same as previous)
+        // ---------------------------------------------------------
+        // 2. OVERLAY LAYERS (Grid & Boundaries)
+        // ---------------------------------------------------------
+        const gridLayer = L.layerGroup();
+        const countryLayer = L.layerGroup();
+        const myStateLayer = L.layerGroup();
+        
+        let countriesLoaded = false;
+        let myStatesLoaded = false;
+
+        // Generate the 5-Degree Grid mathematically
+        for (let lat = -90; lat <= 90; lat += 5) {
+            L.polyline([[lat, -180], [lat, 180]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
+        }
+        for (let lon = -180; lon <= 180; lon += 5) {
+            L.polyline([[-90, lon], [90, lon]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
+        }
+
+        // Toggle Grid
+        document.getElementById('toggle-grid').addEventListener('change', (e) => {
+            e.target.checked ? gridLayer.addTo(map) : map.removeLayer(gridLayer);
+        });
+
+        // Toggle Country Boundaries (Fetches GeoJSON on first click)
+        document.getElementById('toggle-country-bounds').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                countryLayer.addTo(map);
+                if (!countriesLoaded) {
+                    fetch('https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson')
+                        .then(res => res.json())
+                        .then(data => {
+                            L.geoJSON(data, { style: { color: '#aaaaaa', weight: 1.5, fillOpacity: 0, interactive: false } }).addTo(countryLayer);
+                        }).catch(err => console.error("Could not load country bounds", err));
+                    countriesLoaded = true;
+                }
+            } else {
+                map.removeLayer(countryLayer);
+            }
+        });
+
+        // Toggle Malaysia State Boundaries (Fetches GeoJSON on first click)
+        document.getElementById('toggle-my-states').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                myStateLayer.addTo(map);
+                if (!myStatesLoaded) {
+                    fetch('https://raw.githubusercontent.com/nullifye/malaysia.geojson/master/malaysia.state.geojson')
+                        .then(res => res.json())
+                        .then(data => {
+                            L.geoJSON(data, { style: { color: '#00ccff', weight: 1.5, dashArray: '4', fillOpacity: 0, interactive: false } }).addTo(myStateLayer);
+                        }).catch(err => console.error("Could not load Malaysia state bounds", err));
+                    myStatesLoaded = true;
+                }
+            } else {
+                map.removeLayer(myStateLayer);
+            }
+        });
+
+        // ---------------------------------------------------------
+        // 3. STATION DATA
+        // ---------------------------------------------------------
         const stationData = {
             "Myanmar": [{ name: "Yangon", wmo: "48097", lat: 16.79, lon: 96.15 }, { name: "Mandalay", wmo: "48042", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48060", lat: 19.75, lon: 96.10 }],
             "Laos": [{ name: "Vientiane", wmo: "48940", lat: 17.97, lon: 102.56 }, { name: "Luang Prabang", wmo: "48930", lat: 19.88, lon: 102.13 }, { name: "Pakse", wmo: "48955", lat: 15.12, lon: 105.78 }],
@@ -159,11 +230,13 @@
             "Taiwan": [{ name: "Taipei", wmo: "46692", lat: 25.08, lon: 121.23 }, { name: "Kaohsiung", wmo: "46744", lat: 22.57, lon: 120.34 }, { name: "Taichung", wmo: "46749", lat: 24.26, lon: 120.62 }]
         };
 
-        const countryLayers = {};
+        const countryStationLayers = {};
         const isCountryLoaded = {};
-        Object.keys(stationData).forEach(country => { countryLayers[country] = L.layerGroup(); isCountryLoaded[country] = false; });
+        Object.keys(stationData).forEach(country => { countryStationLayers[country] = L.layerGroup(); isCountryLoaded[country] = false; });
 
-        // 3. UI MENUS
+        // ---------------------------------------------------------
+        // 4. UI MENUS
+        // ---------------------------------------------------------
         function toggleMenu(menuId) {
             ['menu-basemap', 'menu-country', 'menu-params'].forEach(id => {
                 const el = document.getElementById(id);
@@ -178,10 +251,12 @@
             });
         });
 
-        // 4. GENERATE 24-HOUR UTC TIMELINE
-        const timelineData = {}; // Format: { "YYYY-MM-DD": ["00:00", "01:00", ...] }
-        const timelineKeys = []; // Array of specific hour keys to track order
-        let selectedHours = [];  // Array to hold up to 3 selected keys
+        // ---------------------------------------------------------
+        // 5. TIMELINE GENERATOR
+        // ---------------------------------------------------------
+        const timelineData = {}; 
+        const timelineKeys = []; 
+        let selectedHours = [];  
 
         const now = new Date();
         for (let i = 0; i < 24; i++) {
@@ -194,19 +269,14 @@
             timelineKeys.push(`${dateStr}_${hourStr}`);
         }
 
-        // Set the most recent hour as default selected
         selectedHours.push(timelineKeys[0]);
 
-        // Populate Date Dropdown
         const dateSelect = document.getElementById('date-select');
         Object.keys(timelineData).forEach(date => {
             const opt = document.createElement('option');
-            opt.value = date;
-            opt.textContent = date;
-            dateSelect.appendChild(opt);
+            opt.value = date; opt.textContent = date; dateSelect.appendChild(opt);
         });
 
-        // Populate Hour Checkboxes based on selected Date
         function renderHours() {
             const hourList = document.getElementById('hour-list');
             hourList.innerHTML = '';
@@ -214,19 +284,13 @@
 
             timelineData[selectedDate].forEach(hour => {
                 const fullKey = `${selectedDate}_${hour}`;
-                
                 const wrapper = document.createElement('div');
                 wrapper.className = 'hour-checkbox-wrapper';
                 
                 const cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.value = fullKey;
-                cb.className = 'hour-toggle';
+                cb.type = 'checkbox'; cb.value = fullKey; cb.className = 'hour-toggle';
                 
-                // If this key is in our array, check it
                 if (selectedHours.includes(fullKey)) cb.checked = true;
-                
-                // Disable unchecked boxes if 3 are already selected
                 if (!cb.checked && selectedHours.length >= 3) cb.disabled = true;
 
                 cb.addEventListener('change', (e) => {
@@ -235,26 +299,22 @@
                     } else {
                         selectedHours = selectedHours.filter(h => h !== fullKey);
                     }
-                    // Re-render UI and Tooltips
                     renderHours();
                     triggerTooltipUpdate();
                 });
 
-                const label = document.createElement('label');
-                label.textContent = hour;
-                
-                wrapper.appendChild(cb);
-                wrapper.appendChild(label);
-                hourList.appendChild(wrapper);
+                const label = document.createElement('label'); label.textContent = hour;
+                wrapper.appendChild(cb); wrapper.appendChild(label); hourList.appendChild(wrapper);
             });
         }
-
         dateSelect.addEventListener('change', renderHours);
-        renderHours(); // Initial render
+        renderHours();
 
-        // 5. ON-MAP DISPLAY (TOOLTIPS) LOGIC
+        // ---------------------------------------------------------
+        // 6. ON-MAP DISPLAY (TOOLTIPS) LOGIC
+        // ---------------------------------------------------------
         function triggerTooltipUpdate() {
-            Object.values(countryLayers).forEach(layerGroup => {
+            Object.values(countryStationLayers).forEach(layerGroup => {
                 layerGroup.eachLayer(marker => updateMarkerTooltip(marker));
             });
         }
@@ -272,11 +332,9 @@
                 rain: document.getElementById('param-rainfall').checked
             };
 
-            // If no parameters are checked, hide completely
             const hasParams = Object.values(activeParams).some(val => val === true);
             
             if (hasParams && selectedHours.length > 0) {
-                // Sort the selected hours chronologically
                 const sortedSelected = [...selectedHours].sort();
 
                 sortedSelected.forEach(hourKey => {
@@ -309,13 +367,15 @@
             checkbox.addEventListener('change', triggerTooltipUpdate);
         });
 
-        // 6. FETCH & SIMULATE DATA
+        // ---------------------------------------------------------
+        // 7. FETCH & SIMULATE DATA
+        // ---------------------------------------------------------
         document.querySelectorAll('.country-toggle').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 const country = e.target.value;
 
                 if (e.target.checked) {
-                    countryLayers[country].addTo(map);
+                    countryStationLayers[country].addTo(map);
                     
                     if (!isCountryLoaded[country]) {
                         stationData[country].forEach(station => {
@@ -325,16 +385,12 @@
                                 .then(response => response.json())
                                 .then(data => {
                                     
-                                    // SIMULATE 24-HOUR HISTORICAL DATA based on current data
                                     const historyStore = {};
-                                    timelineKeys.forEach((key, index) => {
-                                        // 10% chance to simulate "N/A" missing data, as requested
+                                    timelineKeys.forEach((key) => {
                                         const isMissing = Math.random() < 0.1; 
-                                        
                                         if (isMissing) {
                                             historyStore[key] = null;
                                         } else {
-                                            // Apply slight random variations to simulate past 24 hours smoothly
                                             historyStore[key] = {
                                                 temp: (data.main.temp + (Math.random() * 2 - 1)).toFixed(1),
                                                 windSpeed: Math.max(0, (data.wind.speed + (Math.random() - 0.5))).toFixed(1),
@@ -347,15 +403,14 @@
                                     });
 
                                     const marker = L.circleMarker([station.lat, station.lon], {
-                                        radius: 5, fillColor: "#3388ff", color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.9
+                                        radius: 5, fillColor: "#3388ff", color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.9, interactive: true
                                     });
 
-                                    marker.history = historyStore; // Attach history array to marker
-
+                                    marker.history = historyStore; 
                                     marker.bindPopup(`<div class="popup-content"><h3>${station.name} (WMO: ${station.wmo})</h3></div>`);
                                     marker.bindTooltip("", { permanent: true, direction: 'right', className: 'weather-label', offset: [8, 0] });
 
-                                    marker.addTo(countryLayers[country]);
+                                    marker.addTo(countryStationLayers[country]);
                                     updateMarkerTooltip(marker);
                                 })
                                 .catch(err => console.error(`Failed to fetch ${station.name}`, err));
@@ -363,7 +418,7 @@
                         isCountryLoaded[country] = true; 
                     }
                 } else {
-                    map.removeLayer(countryLayers[country]);
+                    map.removeLayer(countryStationLayers[country]);
                 }
             });
         });
