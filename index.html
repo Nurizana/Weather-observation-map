@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Asian WMO Weather Map</title>
+    <title>Secure Global WMO Weather Map</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -154,19 +154,11 @@
         <div>
             <button class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
             <div id="menu-country" class="menu-panel narrow">
-                <label><input type="checkbox" class="country-toggle" value="China"> China (20)</label>
-                <label><input type="checkbox" class="country-toggle" value="Taiwan"> Taiwan (3)</label>
-                <label><input type="checkbox" class="country-toggle" value="Myanmar"> Myanmar (3)</label>
-                <label><input type="checkbox" class="country-toggle" value="Laos"> Laos (3)</label>
-                <label><input type="checkbox" class="country-toggle" value="Thailand"> Thailand (5)</label>
-                <label><input type="checkbox" class="country-toggle" value="Vietnam"> Vietnam (3)</label>
-                <label><input type="checkbox" class="country-toggle" value="Cambodia"> Cambodia (3)</label>
-                <label><input type="checkbox" class="country-toggle" value="Malaysia"> Malaysia (15)</label>
-                <label><input type="checkbox" class="country-toggle" value="Singapore"> Singapore (5)</label>
-                <label><input type="checkbox" class="country-toggle" value="Indonesia"> Indonesia (20)</label>
-                <label><input type="checkbox" class="country-toggle" value="Philippines"> Philippines (20)</label>
-                <label><input type="checkbox" class="country-toggle" value="Brunei"> Brunei (2)</label>
-                <label><input type="checkbox" class="country-toggle" value="TimorLeste"> Timor-Leste (2)</label>
+                <label><input type="checkbox" class="country-toggle" value="Kazakhstan"> Kazakhstan (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Mongolia"> Mongolia (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="India"> India (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Nepal"> Nepal (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Nigeria"> Nigeria (5)</label>
             </div>
         </div>
 
@@ -222,7 +214,6 @@
 
         auth.onAuthStateChanged(user => {
             if (user) {
-                // Email Verification Check
                 if (!user.emailVerified && user.email !== adminEmail) {
                     msgBox.innerHTML = `Please check your email (${user.email}) and click the verification link before logging in.`;
                     auth.signOut();
@@ -234,7 +225,6 @@
                 document.getElementById('display-username').textContent = user.email;
                 document.body.classList.remove('no-print'); 
 
-                // Admin vs Regular User Security
                 if (user.email === adminEmail) {
                     document.body.classList.remove('security-lock');
                     document.removeEventListener('keyup', screenshotBlocker);
@@ -288,11 +278,11 @@
             }
         }
 
-
         // =====================================================================
         // MAP LOGIC
         // =====================================================================
-        const map = L.map('map', { zoomControl: false }).setView([10.0, 110.0], 4);
+        // Changed default center to capture a wider area spanning Nigeria to Mongolia
+        const map = L.map('map', { zoomControl: false }).setView([25.0, 60.0], 4);
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
         const basemaps = {
@@ -347,19 +337,41 @@
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
         const stationData = {
-            "China": [{ name: "Beijing", wmo: "54511", lat: 40.08, lon: 116.58 }, { name: "Shanghai", wmo: "58362", lat: 31.14, lon: 121.80 }, { name: "Guangzhou", wmo: "59287", lat: 23.39, lon: 113.29 }, { name: "Shenzhen", wmo: "59493", lat: 22.63, lon: 113.81 }, { name: "Chengdu", wmo: "56294", lat: 30.57, lon: 103.95 }, { name: "Chongqing", wmo: "57516", lat: 29.71, lon: 106.64 }, { name: "Xi'an", wmo: "57036", lat: 34.44, lon: 108.75 }, { name: "Kunming", wmo: "56778", lat: 25.10, lon: 102.93 }, { name: "Hangzhou", wmo: "58457", lat: 30.22, lon: 120.43 }, { name: "Nanjing", wmo: "58238", lat: 31.74, lon: 118.86 }, { name: "Wuhan", wmo: "57494", lat: 30.78, lon: 114.20 }, { name: "Zhengzhou", wmo: "57083", lat: 34.52, lon: 113.84 }, { name: "Changsha", wmo: "57687", lat: 28.19, lon: 113.21 }, { name: "Qingdao", wmo: "54857", lat: 36.26, lon: 120.01 }, { name: "Xiamen", wmo: "59134", lat: 24.54, lon: 118.12 }, { name: "Haikou", wmo: "59758", lat: 20.05, lon: 110.45 }, { name: "Sanya", wmo: "59948", lat: 18.30, lon: 109.41 }, { name: "Guiyang", wmo: "57816", lat: 26.53, lon: 106.80 }, { name: "Nanning", wmo: "59431", lat: 22.60, lon: 108.17 }, { name: "Fuzhou", wmo: "58847", lat: 25.93, lon: 119.66 }],
-            "Taiwan": [{ name: "Taipei", wmo: "46692", lat: 25.08, lon: 121.23 }, { name: "Kaohsiung", wmo: "46744", lat: 22.57, lon: 120.34 }, { name: "Taichung", wmo: "46749", lat: 24.26, lon: 120.62 }],
-            "Myanmar": [{ name: "Yangon", wmo: "48097", lat: 16.79, lon: 96.15 }, { name: "Mandalay", wmo: "48042", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48060", lat: 19.75, lon: 96.10 }],
-            "Laos": [{ name: "Vientiane", wmo: "48940", lat: 17.97, lon: 102.56 }, { name: "Luang Prabang", wmo: "48930", lat: 19.88, lon: 102.13 }, { name: "Pakse", wmo: "48955", lat: 15.12, lon: 105.78 }],
-            "Thailand": [{ name: "Bangkok", wmo: "48455", lat: 13.75, lon: 100.50 }, { name: "Chiang Mai", wmo: "48327", lat: 18.78, lon: 98.98 }, { name: "Phuket", wmo: "48564", lat: 7.88, lon: 98.39 }, { name: "Khon Kaen", wmo: "48431", lat: 16.43, lon: 102.82 }, { name: "Hat Yai", wmo: "48568", lat: 7.00, lon: 100.46 }],
-            "Vietnam": [{ name: "Hanoi", wmo: "48820", lat: 21.02, lon: 105.83 }, { name: "Ho Chi Minh", wmo: "48900", lat: 10.82, lon: 106.62 }, { name: "Da Nang", wmo: "48855", lat: 16.05, lon: 108.20 }],
-            "Cambodia": [{ name: "Phnom Penh", wmo: "48991", lat: 11.55, lon: 104.91 }, { name: "Siem Reap", wmo: "48966", lat: 13.36, lon: 103.85 }, { name: "Sihanoukville", wmo: "48995", lat: 10.62, lon: 103.52 }],
-            "Malaysia": [{ name: "Sepang KLIA", wmo: "48647", lat: 2.75, lon: 101.70 }, { name: "Subang", wmo: "48648", lat: 3.13, lon: 101.55 }, { name: "Penang", wmo: "48601", lat: 5.29, lon: 100.27 }, { name: "Langkawi", wmo: "48603", lat: 6.33, lon: 99.73 }, { name: "Alor Setar", wmo: "48602", lat: 6.19, lon: 100.40 }, { name: "Ipoh", wmo: "48625", lat: 4.56, lon: 101.09 }, { name: "Malacca", wmo: "48665", lat: 2.25, lon: 102.25 }, { name: "Johor Bahru", wmo: "48679", lat: 1.63, lon: 103.66 }, { name: "Kuantan", wmo: "48657", lat: 3.77, lon: 103.21 }, { name: "Kuala Terengganu", wmo: "48615", lat: 5.38, lon: 103.10 }, { name: "Kota Bharu", wmo: "48616", lat: 6.16, lon: 102.29 }, { name: "Kuching", wmo: "96413", lat: 1.48, lon: 110.33 }, { name: "Sibu", wmo: "96421", lat: 2.26, lon: 111.82 }, { name: "Bintulu", wmo: "96441", lat: 3.20, lon: 113.03 }, { name: "Kota Kinabalu", wmo: "96471", lat: 5.93, lon: 116.05 }],
-            "Singapore": [{ name: "Changi", wmo: "48698", lat: 1.36, lon: 103.99 }, { name: "Paya Lebar", wmo: "48694", lat: 1.36, lon: 103.91 }, { name: "Seletar", wmo: "48696", lat: 1.41, lon: 103.86 }, { name: "Tengah", wmo: "48697", lat: 1.38, lon: 103.71 }, { name: "Sentosa", wmo: "48699", lat: 1.24, lon: 103.82 }],
-            "Indonesia": [{ name: "Jakarta", wmo: "96749", lat: -6.12, lon: 106.65 }, { name: "Bandung", wmo: "96773", lat: -6.90, lon: 107.57 }, { name: "Surabaya", wmo: "96935", lat: -7.37, lon: 112.78 }, { name: "Yogyakarta", wmo: "96805", lat: -7.87, lon: 110.43 }, { name: "Semarang", wmo: "96839", lat: -6.98, lon: 110.37 }, { name: "Medan", wmo: "96035", lat: 3.63, lon: 98.88 }, { name: "Padang", wmo: "96163", lat: -0.88, lon: 100.32 }, { name: "Palembang", wmo: "96221", lat: -2.89, lon: 104.70 }, { name: "Pekanbaru", wmo: "96109", lat: 0.46, lon: 101.44 }, { name: "Batam", wmo: "96171", lat: 1.12, lon: 104.11 }, { name: "Denpasar", wmo: "97230", lat: -8.74, lon: 115.16 }, { name: "Lombok", wmo: "97240", lat: -8.75, lon: 116.27 }, { name: "Kupang", wmo: "97372", lat: -10.17, lon: 123.67 }, { name: "Pontianak", wmo: "96565", lat: -0.05, lon: 109.40 }, { name: "Balikpapan", wmo: "96633", lat: -1.26, lon: 116.89 }, { name: "Samarinda", wmo: "96607", lat: -0.48, lon: 117.15 }, { name: "Banjarmasin", wmo: "96685", lat: -3.44, lon: 114.75 }, { name: "Makassar", wmo: "97180", lat: -5.06, lon: 119.55 }, { name: "Manado", wmo: "97014", lat: 1.53, lon: 124.92 }, { name: "Ambon", wmo: "97300", lat: -3.70, lon: 128.18 }],
-            "Philippines": [{ name: "Manila", wmo: "98429", lat: 14.51, lon: 121.01 }, { name: "Clark", wmo: "98327", lat: 15.18, lon: 120.55 }, { name: "Subic", wmo: "98426", lat: 14.79, lon: 120.27 }, { name: "Laoag", wmo: "98223", lat: 18.17, lon: 120.53 }, { name: "Tuguegarao", wmo: "98233", lat: 17.63, lon: 121.73 }, { name: "Baguio", wmo: "98328", lat: 16.37, lon: 120.62 }, { name: "Legazpi", wmo: "98444", lat: 13.15, lon: 123.73 }, { name: "Puerto Princesa", wmo: "98618", lat: 9.73, lon: 118.75 }, { name: "Iloilo", wmo: "98637", lat: 10.83, lon: 122.53 }, { name: "Bacolod", wmo: "98630", lat: 10.77, lon: 123.01 }, { name: "Cebu", wmo: "98646", lat: 10.31, lon: 123.97 }, { name: "Tagbilaran", wmo: "98644", lat: 9.66, lon: 123.85 }, { name: "Tacloban", wmo: "98550", lat: 11.22, lon: 125.02 }, { name: "Zamboanga", wmo: "98836", lat: 6.92, lon: 122.06 }, { name: "Davao", wmo: "98753", lat: 7.12, lon: 125.64 }, { name: "General Santos", wmo: "98755", lat: 6.06, lon: 125.09 }, { name: "Cotabato", wmo: "98746", lat: 7.16, lon: 124.21 }, { name: "Cagayan de Oro", wmo: "98748", lat: 8.41, lon: 124.61 }, { name: "Butuan", wmo: "98752", lat: 8.95, lon: 125.47 }, { name: "Surigao", wmo: "98543", lat: 9.79, lon: 125.48 }],
-            "Brunei": [{ name: "Brunei Int", wmo: "96315", lat: 4.94, lon: 114.93 }, { name: "Seria", wmo: "96311", lat: 4.60, lon: 114.31 }],
-            "TimorLeste": [{ name: "Dili", wmo: "97390", lat: -8.55, lon: 125.52 }, { name: "Baucau", wmo: "97392", lat: -8.48, lon: 126.39 }]
+            "Kazakhstan": [
+                { name: "Astana", wmo: "35188", lat: 51.16, lon: 71.42 },
+                { name: "Almaty", wmo: "36870", lat: 43.23, lon: 76.88 },
+                { name: "Shymkent", wmo: "38328", lat: 42.31, lon: 69.59 },
+                { name: "Karaganda", wmo: "35394", lat: 49.80, lon: 73.10 },
+                { name: "Aktobe", wmo: "35229", lat: 50.27, lon: 57.22 }
+            ],
+            "Mongolia": [
+                { name: "Ulaanbaatar", wmo: "44292", lat: 47.92, lon: 106.91 },
+                { name: "Erdenet", wmo: "44231", lat: 49.02, lon: 104.04 },
+                { name: "Darkhan", wmo: "44230", lat: 49.48, lon: 105.92 },
+                { name: "Khovd", wmo: "44218", lat: 48.00, lon: 91.63 },
+                { name: "Choibalsan", wmo: "44314", lat: 48.07, lon: 114.53 }
+            ],
+            "India": [
+                { name: "New Delhi", wmo: "42182", lat: 28.61, lon: 77.20 },
+                { name: "Mumbai", wmo: "43003", lat: 19.07, lon: 72.87 },
+                { name: "Kolkata", wmo: "42809", lat: 22.57, lon: 88.36 },
+                { name: "Chennai", wmo: "43279", lat: 13.08, lon: 80.27 },
+                { name: "Dehradun", wmo: "42111", lat: 30.31, lon: 78.03 }
+            ],
+            "Nepal": [
+                { name: "Kathmandu", wmo: "44454", lat: 27.71, lon: 85.32 },
+                { name: "Pokhara", wmo: "44434", lat: 28.20, lon: 83.98 },
+                { name: "Lumbini", wmo: "44443", lat: 27.50, lon: 83.45 },
+                { name: "Biratnagar", wmo: "44477", lat: 26.45, lon: 87.28 },
+                { name: "Nepalgunj", wmo: "44431", lat: 28.05, lon: 81.61 }
+            ],
+            "Nigeria": [
+                { name: "Abuja", wmo: "65122", lat: 9.07, lon: 7.39 },
+                { name: "Lagos", wmo: "65201", lat: 6.52, lon: 3.37 },
+                { name: "Kano", wmo: "65046", lat: 12.00, lon: 8.59 },
+                { name: "Ibadan", wmo: "65208", lat: 7.37, lon: 3.94 },
+                { name: "Port Harcourt", wmo: "65250", lat: 4.81, lon: 7.04 }
+            ]
         };
 
         const countryStationLayers = {}; const isCountryLoaded = {};
