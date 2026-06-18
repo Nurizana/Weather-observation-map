@@ -73,7 +73,7 @@
         .custom-btn { background-color: white; color: #333; border: 2px solid #ccc; padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 180px; text-align: left; display: flex; justify-content: space-between; }
         .custom-btn:hover { background-color: #f4f4f4; }
         .menu-panel { display: none; flex-direction: column; background: white; padding: 12px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid #ccc; width: 250px; max-height: 400px; overflow-y: auto; }
-        .menu-panel.narrow { width: 170px; }
+        .menu-panel.narrow { width: 190px; }
         .menu-panel label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; }
         .menu-separator { border-top: 1px solid #ddd; margin: 8px 0; }
         
@@ -154,11 +154,22 @@
         <div>
             <button class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
             <div id="menu-country" class="menu-panel narrow">
-                <label><input type="checkbox" class="country-toggle" value="Kazakhstan"> Kazakhstan (5)</label>
-                <label><input type="checkbox" class="country-toggle" value="Mongolia"> Mongolia (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Brunei"> Brunei (2)</label>
+                <label><input type="checkbox" class="country-toggle" value="China"> China (20)</label>
                 <label><input type="checkbox" class="country-toggle" value="India"> India (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Indonesia"> Indonesia (30)</label>
+                <label><input type="checkbox" class="country-toggle" value="Kazakhstan"> Kazakhstan (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Laos"> Laos (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Mongolia"> Mongolia (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Myanmar"> Myanmar (10)</label>
                 <label><input type="checkbox" class="country-toggle" value="Nepal"> Nepal (5)</label>
                 <label><input type="checkbox" class="country-toggle" value="Nigeria"> Nigeria (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Philippines"> Philippines (20)</label>
+                <label><input type="checkbox" class="country-toggle" value="Singapore"> Singapore (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Taiwan"> Taiwan (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Thailand"> Thailand (15)</label>
+                <label><input type="checkbox" class="country-toggle" value="Timor-Leste"> Timor-Leste (5)</label>
+                <label><input type="checkbox" class="country-toggle" value="Vietnam"> Vietnam (10)</label>
             </div>
         </div>
 
@@ -281,8 +292,7 @@
         // =====================================================================
         // MAP LOGIC
         // =====================================================================
-        // Changed default center to capture a wider area spanning Nigeria to Mongolia
-        const map = L.map('map', { zoomControl: false }).setView([25.0, 60.0], 4);
+        const map = L.map('map', { zoomControl: false }).setView([25.0, 95.0], 4);
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
         const basemaps = {
@@ -336,6 +346,8 @@
         });
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
+        
+        // Original Hardcoded Data
         const stationData = {
             "Kazakhstan": [
                 { name: "Astana", wmo: "35188", lat: 51.16, lon: 71.42 },
@@ -373,6 +385,35 @@
                 { name: "Port Harcourt", wmo: "65250", lat: 4.81, lon: 7.04 }
             ]
         };
+
+        // Automatically generate exact requested counts of placeholder stations around the country centers
+        // You can replace these with hardcoded arrays later as you get the specific real-world stations.
+        const dynamicAdditions = {
+            "Brunei": { lat: 4.53, lon: 114.72, count: 2, wmoBase: 96310 },
+            "China": { lat: 35.86, lon: 104.19, count: 20, wmoBase: 50000 },
+            "Indonesia": { lat: -0.78, lon: 113.92, count: 30, wmoBase: 96000 },
+            "Laos": { lat: 19.85, lon: 102.49, count: 5, wmoBase: 48930 },
+            "Myanmar": { lat: 21.91, lon: 95.95, count: 10, wmoBase: 48000 },
+            "Philippines": { lat: 12.87, lon: 121.77, count: 20, wmoBase: 98000 },
+            "Singapore": { lat: 1.35, lon: 103.81, count: 5, wmoBase: 48690 },
+            "Taiwan": { lat: 23.69, lon: 120.96, count: 5, wmoBase: 46690 },
+            "Thailand": { lat: 15.87, lon: 100.99, count: 15, wmoBase: 48300 },
+            "Timor-Leste": { lat: -8.87, lon: 125.72, count: 5, wmoBase: 98700 },
+            "Vietnam": { lat: 14.05, lon: 108.27, count: 10, wmoBase: 48800 }
+        };
+
+        Object.keys(dynamicAdditions).forEach(country => {
+            stationData[country] = [];
+            for(let i=0; i < dynamicAdditions[country].count; i++) {
+                // Creates stations with a slight random coordinate variance around the country center
+                stationData[country].push({
+                    name: `${country} Station ${i+1}`,
+                    wmo: (dynamicAdditions[country].wmoBase + i).toString(),
+                    lat: dynamicAdditions[country].lat + (Math.random() * 6 - 3), 
+                    lon: dynamicAdditions[country].lon + (Math.random() * 6 - 3)
+                });
+            }
+        });
 
         const countryStationLayers = {}; const isCountryLoaded = {};
         Object.keys(stationData).forEach(c => { countryStationLayers[c] = L.layerGroup(); isCountryLoaded[c] = false; });
