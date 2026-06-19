@@ -41,7 +41,7 @@
         .auth-btn { padding: 10px 20px; font-weight: bold; cursor: pointer; border: 1px solid #333; border-radius: 4px; margin-top: 10px; background: white;}
         .auth-btn:hover { background: #eee; }
         
-        #auth-message { margin-top: 30px; color: white; font-size: 16px; text-align: center; height: 30px; }
+        #auth-message { margin-top: 30px; color: white; font-size: 16px; text-align: center; min-height: 30px; }
 
         /* ---------------------------------------------------
            TOP LEFT USER PROFILE
@@ -228,9 +228,19 @@
         auth.onAuthStateChanged(user => {
             if (user) {
                 if (!user.emailVerified && user.email !== adminEmail) {
-                    msgBox.innerHTML = `Please check your email (${user.email}) and click the verification link before logging in.`;
-                    auth.signOut();
-                    return;
+                    msgBox.innerHTML = `Please check your email (${user.email}) and click the verification link before logging in.<br><button class="auth-btn" style="margin-top: 10px;" onclick="resendEmail()">Resend Verification Email</button>`;
+                    
+                    window.resendEmail = function() {
+                        msgBox.textContent = "Sending...";
+                        user.sendEmailVerification().then(() => {
+                            msgBox.innerHTML = `Success! A new verification link has been sent to <b>${user.email}</b>. Please also check your spam/junk folder.`;
+                            auth.signOut();
+                        }).catch(err => {
+                            msgBox.innerHTML = "Error resending: " + err.message;
+                            auth.signOut();
+                        });
+                    };
+                    return; // Do not sign them out yet, so they can click the button
                 }
                 
                 document.getElementById('auth-overlay').style.display = 'none';
@@ -259,7 +269,8 @@
             
             auth.createUserWithEmailAndPassword(email, pass)
                 .then((userCredential) => {
-                    userCredential.user.sendEmailVerification().then(() => {
+                    // Added "return" to correctly catch email sending failures in the chain
+                    return userCredential.user.sendEmailVerification().then(() => {
                         msgBox.innerHTML = `Success! A verification link has been sent to <b>${email}</b>. Please verify your email before logging in.`;
                         auth.signOut(); 
                     });
