@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#222222">
-    <title>Secure Global WMO Weather Map</title>
+    <title>Pilot GIS Web</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -16,6 +16,26 @@
         #map { width: 100vw; height: 100vh; z-index: 1; }
         
         * { box-sizing: border-box; }
+
+        /* ---------------------------------------------------
+           APP TITLE
+           --------------------------------------------------- */
+        #app-title {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 25px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 1px solid #ccc;
+            font-size: 22px;
+            font-weight: bold;
+            color: #222;
+            text-align: center;
+        }
 
         /* ---------------------------------------------------
            SECURITY / AUTHENTICATION OVERLAY 
@@ -95,6 +115,10 @@
         .menu-panel.narrow { width: 200px; }
         .menu-panel label { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; cursor: pointer; }
         .menu-separator { border-top: 1px solid #ddd; margin: 10px 0; }
+
+        .search-box { display: flex; gap: 5px; }
+        #loc-search { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; width: 180px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); background: rgba(255, 255, 255, 0.95); }
+        .search-btn { width: auto; padding: 10px; justify-content: center; }
         
         /* ---------------------------------------------------
            RADAR LEGEND & POPUPS
@@ -140,9 +164,11 @@
             .arrow-down { border-left-width: 140px; border-right-width: 140px; }
             
             #user-profile { top: auto; bottom: 20px; left: 10px; padding: 6px 10px; font-size: 12px; gap: 10px; }
+            #app-title { font-size: 16px; padding: 6px 15px; width: 160px; white-space: nowrap; }
             
             .ui-container { top: 10px; right: 10px; gap: 8px; }
             .custom-btn { width: 140px; font-size: 12px; padding: 8px 12px; }
+            #loc-search { width: 140px; padding: 8px; font-size: 12px;}
             .menu-panel { width: 85vw; max-width: 290px; }
             .menu-panel.narrow { width: 200px; }
             
@@ -177,6 +203,8 @@
         <div id="auth-message">Please log in or register to view the map.</div>
     </div>
 
+    <div id="app-title" class="no-print">Pilot GIS Web</div>
+
     <div id="user-profile" class="no-print">
         <span id="display-username">user@email.com</span>
         <button id="logout-btn" onclick="logoutUser()">Log Out</button>
@@ -192,13 +220,18 @@
     </div>
 
     <div class="ui-container no-print">
+
+        <div class="search-box dropdown-wrapper">
+            <input type="text" id="loc-search" placeholder="Search location..." onkeypress="if(event.key === 'Enter') searchLocation()">
+            <button class="custom-btn search-btn" onclick="searchLocation()">🔍</button>
+        </div>
         
         <div class="dropdown-wrapper">
             <button class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
             <div id="menu-basemap" class="menu-panel narrow">
                 <label><input type="radio" name="basemap" value="night" checked> Night Mode</label>
-                <label><input type="radio" name="basemap" value="ocean"> Blue Ocean</label>
-                <label><input type="radio" name="basemap" value="satellite"> Satellite</label>
+                <label><input type="radio" name="basemap" value="ocean"> Blue Ocean (Labeled)</label>
+                <label><input type="radio" name="basemap" value="satellite"> Satellite (Labeled)</label>
                 <div class="menu-separator"></div>
                 <div style="font-size: 11px; color:#777; margin-bottom: 5px;">OVERLAYS</div>
                 <label><input type="checkbox" id="toggle-grid"> 5 Degree Grid</label>
@@ -373,10 +406,17 @@
         
         if(window.innerWidth > 768) { L.control.zoom({ position: 'topleft' }).addTo(map); }
 
+        // Updated Basemaps with Label Layers Overlayed via L.layerGroup
         const basemaps = {
             night: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
-            ocean: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13 }),
-            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')
+            ocean: L.layerGroup([
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13 }),
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13 })
+            ]),
+            satellite: L.layerGroup([
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}')
+            ])
         };
         basemaps.night.addTo(map);
 
@@ -413,6 +453,30 @@
                 }
             } else { map.removeLayer(myStateLayer); }
         });
+
+        // ---------------------------------------------------------------------
+        // LOCATION SEARCH LOGIC
+        // ---------------------------------------------------------------------
+        function searchLocation() {
+            const query = document.getElementById('loc-search').value;
+            if (!query) return;
+            
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        map.setView([lat, lon], 10);
+                    } else {
+                        alert("Location not found. Please try a different search term.");
+                    }
+                })
+                .catch(err => {
+                    console.error("Geocoding Error:", err);
+                    alert("An error occurred while searching for the location.");
+                });
+        }
 
         // ---------------------------------------------------------------------
         // RAINFALL RADAR LOGIC
