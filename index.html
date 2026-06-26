@@ -90,7 +90,7 @@
             display: none; position: absolute; top: calc(100% + 5px); right: 0;
             flex-direction: column; background: rgba(255, 255, 255, 0.98); padding: 12px; 
             border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 1px solid #ccc; 
-            width: 260px; max-height: 60vh; overflow-y: auto; z-index: 1001;
+            width: 280px; max-height: 60vh; overflow-y: auto; z-index: 1001;
         }
         .menu-panel.narrow { width: 200px; }
         .menu-panel label { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; cursor: pointer; }
@@ -109,10 +109,10 @@
         .radar-labels { display: flex; justify-content: space-between; font-size: 10px; margin-top: 3px; font-weight: bold; color: #555; }
         
         .time-control-container { display: flex; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px; gap: 10px; }
-        .date-section { flex: 1; }
-        .hour-section { flex: 1; border: 1px solid #ccc; border-radius: 4px; padding: 5px; max-height: 120px; overflow-y: auto; background: #f9f9f9; }
+        .date-section { flex: 1; min-width: 90px; }
+        .hour-section { flex: 1.5; border: 1px solid #ccc; border-radius: 4px; padding: 5px; max-height: 120px; overflow-y: auto; background: #f9f9f9; }
         .time-header { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; }
-        .hour-checkbox-wrapper { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; font-size: 12px; }
+        .hour-checkbox-wrapper { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; font-size: 11px; white-space: nowrap; }
 
         .popup-content h3 { margin: 0 0 5px 0; font-size: 15px; }
         .weather-label { background: rgba(255, 255, 255, 0.95); border: 1px solid #999; border-radius: 4px; box-shadow: 1px 1px 3px rgba(0,0,0,0.3); font-size: 11px; color: #222; line-height: 1.3; padding: 4px 6px; white-space: nowrap; }
@@ -143,7 +143,7 @@
             
             .ui-container { top: 10px; right: 10px; gap: 8px; }
             .custom-btn { width: 140px; font-size: 12px; padding: 8px 12px; }
-            .menu-panel { width: 85vw; max-width: 280px; }
+            .menu-panel { width: 85vw; max-width: 290px; }
             .menu-panel.narrow { width: 200px; }
             
             #radar-legend { bottom: 70px; left: 10px; width: 170px; padding: 8px 10px; }
@@ -239,14 +239,14 @@
         </div>
 
         <div class="dropdown-wrapper">
-            <button class="custom-btn" onclick="toggleMenu('menu-params')">Hourly Params <span>▼</span></button>
+            <button class="custom-btn" onclick="toggleMenu('menu-params')">Parameters <span>▼</span></button>
             <div id="menu-params" class="menu-panel">
                 <label><input type="checkbox" class="param-toggle" id="param-temp" checked> Temperature</label>
                 <label><input type="checkbox" class="param-toggle" id="param-windspeed"> Wind Speed</label>
                 <label><input type="checkbox" class="param-toggle" id="param-winddir"> Wind Direction</label>
                 <label><input type="checkbox" class="param-toggle" id="param-humidity"> Humidity</label>
                 <label><input type="checkbox" class="param-toggle" id="param-pressure"> Pressure</label>
-                <label><input type="checkbox" class="param-toggle" id="param-rainfall"> Rainfall</label>
+                <label><input type="checkbox" class="param-toggle" id="param-rainfall" checked> Rainfall</label>
                 
                 <div class="time-control-container">
                     <div class="date-section">
@@ -254,7 +254,7 @@
                         <select id="date-select" style="width: 100%; padding: 4px; font-size: 12px;"></select>
                     </div>
                     <div class="hour-section">
-                        <div class="time-header">24 Hour UTC [Max 3]</div>
+                        <div class="time-header">24 Hour (UTC/MYT) [Max 3]</div>
                         <div id="hour-list"></div>
                     </div>
                 </div>
@@ -584,8 +584,14 @@
                     triggerTooltipUpdate(); 
                 });
                 
+                // Calculate MYT from UTC (+8 hours)
+                const utcHourNum = parseInt(hour.split(':')[0], 10);
+                const mytHourNum = (utcHourNum + 8) % 24;
+                const mytHourStr = String(mytHourNum).padStart(2, '0') + ':00';
+                
                 const label = document.createElement('label'); 
-                label.textContent = hour;
+                label.textContent = `${hour}UTC/${mytHourStr}MYT`;
+                
                 wrapper.appendChild(cb); 
                 wrapper.appendChild(label); 
                 hourList.appendChild(wrapper);
