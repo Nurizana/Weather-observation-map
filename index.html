@@ -230,8 +230,8 @@
             <button class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
             <div id="menu-basemap" class="menu-panel narrow">
                 <label><input type="radio" name="basemap" value="night" checked> Night Mode</label>
-                <label><input type="radio" name="basemap" value="ocean"> Blue Ocean (Labeled)</label>
-                <label><input type="radio" name="basemap" value="satellite"> Satellite (Labeled)</label>
+                <label><input type="radio" name="basemap" value="ocean"> Blue Ocean</label>
+                <label><input type="radio" name="basemap" value="satellite"> Satellite</label>
                 <div class="menu-separator"></div>
                 <div style="font-size: 11px; color:#777; margin-bottom: 5px;">OVERLAYS</div>
                 <label><input type="checkbox" id="toggle-grid"> 5 Degree Grid</label>
@@ -406,7 +406,7 @@
         
         if(window.innerWidth > 768) { L.control.zoom({ position: 'topleft' }).addTo(map); }
 
-        // Updated Basemaps with Label Layers Overlayed via L.layerGroup
+        // Base Maps with Label Layers Overlayed via L.layerGroup
         const basemaps = {
             night: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
             ocean: L.layerGroup([
