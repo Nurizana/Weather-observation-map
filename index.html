@@ -121,24 +121,12 @@
         .search-btn { width: auto; padding: 10px; justify-content: center; }
         
         /* ---------------------------------------------------
-           SCALE BAR & MEASURE STYLES
+           SCALE & MEASURE STYLES
            --------------------------------------------------- */
-        #scale-wrapper {
-            width: 100%; display: flex; justify-content: flex-end; margin-bottom: 2px;
-        }
-        /* Override leaflet defaults so it fits natively into our UI container */
-        #scale-wrapper .leaflet-control-scale {
-            margin: 0 !important;
-            border: none !important;
-            background: rgba(255, 255, 255, 0.85);
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        #scale-wrapper .leaflet-control-scale-line {
-            border: 2px solid #333; border-top: none; padding: 2px 6px;
-            font-size: 11px; font-weight: bold; color: #111;
-            background: transparent; box-sizing: border-box;
+        #dynamic-scale-btn {
+            cursor: default; /* Not clickable */
+            justify-content: center;
+            color: #0056b3;
         }
         
         .measure-tooltip {
@@ -253,7 +241,9 @@
             <button class="custom-btn search-btn" onclick="searchLocation()">🔍</button>
         </div>
         
-        <div id="scale-wrapper"></div>
+        <div class="dropdown-wrapper">
+            <div class="custom-btn" id="dynamic-scale-btn">📏 1 cm : -- km</div>
+        </div>
         
         <div class="dropdown-wrapper" style="display:flex; gap:5px; justify-content:flex-end;">
             <button class="custom-btn" id="measure-clear" onclick="clearMeasurement()" style="display:none; width:auto; padding: 10px; color:#ff4c4c;" title="Clear Measurement">🗑️</button>
@@ -440,10 +430,39 @@
         
         if(window.innerWidth > 768) { L.control.zoom({ position: 'topleft' }).addTo(map); }
 
-        // --- NEW DYNAMIC SCALE BAR ---
-        // Create the Leaflet control but inject its container into our custom UI box
-        const scaleControl = L.control.scale({ metric: true, imperial: false, position: 'bottomright' }).addTo(map);
-        document.getElementById('scale-wrapper').appendChild(scaleControl.getContainer());
+        // --- CUSTOM DYNAMIC SCALE RATIO ---
+        function updateCustomScale() {
+            // CSS defines 1cm as 96px / 2.54 = ~37.795 pixels.
+            const pixelsPerCm = 37.79527559;
+            
+            const center = map.getCenter();
+            const centerPoint = map.project(center, map.getZoom());
+            
+            // Add 1 cm worth of pixels horizontally to find the equivalent real-world point
+            const point1cmAway = L.point(centerPoint.x + pixelsPerCm, centerPoint.y);
+            const latLng1cmAway = map.unproject(point1cmAway, map.getZoom());
+            
+            // Get accurate distance between the center and the 1cm offset using geodesic distance
+            const distanceMeters = center.distanceTo(latLng1cmAway);
+            
+            let distStr = "";
+            if (distanceMeters >= 1000) {
+                // If larger than 1km, show km
+                let km = distanceMeters / 1000;
+                // Add sensible decimal precision based on zoom
+                distStr = (km >= 10 ? Math.round(km) : km.toFixed(2)) + " km";
+            } else {
+                // Otherwise show meters
+                distStr = Math.round(distanceMeters) + " m";
+            }
+            
+            document.getElementById('dynamic-scale-btn').innerHTML = `📐 1 cm : ${distStr}`;
+        }
+
+        // Update scale when zooming or panning (latitude impacts Mercator scale)
+        map.on('zoom', updateCustomScale);
+        map.on('move', updateCustomScale);
+        updateCustomScale(); // Initial call
 
 
         // --- MEASUREMENT TOOL LOGIC ---
@@ -459,13 +478,13 @@
             
             if (isMeasuring) {
                 btn.classList.add('measure-active');
-                btn.innerHTML = "📏 Measure: ON";
+                btn.innerHTML = "📐 Measure: ON";
                 clearBtn.style.display = "flex";
                 document.getElementById('map').style.cursor = 'crosshair';
                 map.on('click', onMeasureClick);
             } else {
                 btn.classList.remove('measure-active');
-                btn.innerHTML = "📏 Measure";
+                btn.innerHTML = "📐 Measure";
                 document.getElementById('map').style.cursor = '';
                 map.off('click', onMeasureClick);
                 if (measurePoints.length === 0) clearBtn.style.display = "none";
