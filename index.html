@@ -121,6 +121,33 @@
         .search-btn { width: auto; padding: 10px; justify-content: center; }
         
         /* ---------------------------------------------------
+           SCALE BAR & MEASURE STYLES
+           --------------------------------------------------- */
+        #scale-wrapper {
+            width: 100%; display: flex; justify-content: flex-end; margin-bottom: 2px;
+        }
+        /* Override leaflet defaults so it fits natively into our UI container */
+        #scale-wrapper .leaflet-control-scale {
+            margin: 0 !important;
+            border: none !important;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        #scale-wrapper .leaflet-control-scale-line {
+            border: 2px solid #333; border-top: none; padding: 2px 6px;
+            font-size: 11px; font-weight: bold; color: #111;
+            background: transparent; box-sizing: border-box;
+        }
+        
+        .measure-tooltip {
+            background: rgba(0, 0, 0, 0.8); border: 1px solid #fff;
+            color: #fff; font-weight: bold; font-size: 12px;
+        }
+        .measure-active { background-color: #ffcccc !important; color: #990000; border-color: #990000; }
+
+        /* ---------------------------------------------------
            RADAR LEGEND & POPUPS
            --------------------------------------------------- */
         #radar-legend { 
@@ -226,6 +253,13 @@
             <button class="custom-btn search-btn" onclick="searchLocation()">🔍</button>
         </div>
         
+        <div id="scale-wrapper"></div>
+        
+        <div class="dropdown-wrapper" style="display:flex; gap:5px; justify-content:flex-end;">
+            <button class="custom-btn" id="measure-clear" onclick="clearMeasurement()" style="display:none; width:auto; padding: 10px; color:#ff4c4c;" title="Clear Measurement">🗑️</button>
+            <button class="custom-btn" id="measure-btn" onclick="toggleMeasurement()">📏 Measure</button>
+        </div>
+
         <div class="dropdown-wrapper">
             <button class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
             <div id="menu-basemap" class="menu-panel narrow">
@@ -405,6 +439,76 @@
         const map = L.map('map', { zoomControl: false }).setView([15.0, 105.0], 4);
         
         if(window.innerWidth > 768) { L.control.zoom({ position: 'topleft' }).addTo(map); }
+
+        // --- NEW DYNAMIC SCALE BAR ---
+        // Create the Leaflet control but inject its container into our custom UI box
+        const scaleControl = L.control.scale({ metric: true, imperial: false, position: 'bottomright' }).addTo(map);
+        document.getElementById('scale-wrapper').appendChild(scaleControl.getContainer());
+
+
+        // --- MEASUREMENT TOOL LOGIC ---
+        let isMeasuring = false;
+        let measureLayer = L.layerGroup().addTo(map);
+        let measurePoints = [];
+        let measureLine = null;
+
+        function toggleMeasurement() {
+            isMeasuring = !isMeasuring;
+            const btn = document.getElementById('measure-btn');
+            const clearBtn = document.getElementById('measure-clear');
+            
+            if (isMeasuring) {
+                btn.classList.add('measure-active');
+                btn.innerHTML = "📏 Measure: ON";
+                clearBtn.style.display = "flex";
+                document.getElementById('map').style.cursor = 'crosshair';
+                map.on('click', onMeasureClick);
+            } else {
+                btn.classList.remove('measure-active');
+                btn.innerHTML = "📏 Measure";
+                document.getElementById('map').style.cursor = '';
+                map.off('click', onMeasureClick);
+                if (measurePoints.length === 0) clearBtn.style.display = "none";
+            }
+        }
+
+        function onMeasureClick(e) {
+            measurePoints.push(e.latlng);
+            
+            // Add point marker
+            const marker = L.circleMarker(e.latlng, {
+                radius: 5, fillColor: "#ff4c4c", color: "#fff", weight: 2, fillOpacity: 1
+            }).addTo(measureLayer);
+
+            if (measurePoints.length > 1) {
+                if (measureLine) measureLayer.removeLayer(measureLine);
+                
+                measureLine = L.polyline(measurePoints, {
+                    color: '#ff4c4c', weight: 3, dashArray: '5, 8'
+                }).addTo(measureLayer);
+
+                // Calculate cumulative distance
+                let totalDistance = 0;
+                for (let i = 0; i < measurePoints.length - 1; i++) {
+                    totalDistance += measurePoints[i].distanceTo(measurePoints[i+1]);
+                }
+
+                const distText = totalDistance > 1000 
+                    ? (totalDistance / 1000).toFixed(2) + " km" 
+                    : totalDistance.toFixed(1) + " m";
+
+                marker.bindTooltip(distText, {
+                    permanent: true, direction: 'right', className: 'measure-tooltip'
+                }).openTooltip();
+            }
+        }
+
+        function clearMeasurement() {
+            measureLayer.clearLayers();
+            measurePoints = [];
+            measureLine = null;
+            if (!isMeasuring) document.getElementById('measure-clear').style.display = "none";
+        }
 
         // Base Maps with Label Layers Overlayed via L.layerGroup
         const basemaps = {
