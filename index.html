@@ -242,7 +242,7 @@
         </div>
         
         <div class="dropdown-wrapper">
-            <div class="custom-btn" id="dynamic-scale-btn">📏 1 cm : -- km</div>
+            <div class="custom-btn" id="dynamic-scale-btn">📐 1 cm : -- km</div>
         </div>
         
         <div class="dropdown-wrapper" style="display:flex; gap:5px; justify-content:flex-end;">
@@ -626,7 +626,14 @@
                         document.getElementById('radar-time').innerHTML = `${dateStr} <br> UTC: ${utcStr} <br> ${mytStr}`;
                         
                         if (radarLayer) map.removeLayer(radarLayer);
-                        radarLayer = L.tileLayer(`${data.host}${latestScan.path}/256/{z}/{x}/{y}/2/1_1.png`, { opacity: 0.65, zIndex: 10 }).addTo(map);
+                        
+                        // UPDATED: Added maxNativeZoom and maxZoom properties to scale tiles properly
+                        radarLayer = L.tileLayer(`${data.host}${latestScan.path}/256/{z}/{x}/{y}/2/1_1.png`, { 
+                            opacity: 0.65, 
+                            zIndex: 10,
+                            maxNativeZoom: 7, 
+                            maxZoom: 20
+                        }).addTo(map);
                     }).catch(() => document.getElementById('radar-time').textContent = "Error fetching data.");
             } else { 
                 legendDiv.style.display = 'none'; 
