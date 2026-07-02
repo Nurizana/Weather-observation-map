@@ -697,7 +697,7 @@
                 }
             } else {
                 satelliteLayer = L.tileLayer.wms("https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi", {
-                    layers: 'GPM_3IMERGHHE_Precipitation_Rate',
+                    layers: 'IMERG_Precipitation_Rate', // FIX APPLIED HERE
                     format: 'image/png',
                     transparent: true,
                     opacity: 0.65,
