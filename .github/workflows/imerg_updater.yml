@@ -12,23 +12,20 @@ jobs:
       contents: write
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Install Python GIS Libraries
-        run: pip install requests xarray netCDF4 h5netcdf matplotlib numpy
-
-      - name: Configure NASA Authentication
-        run: |
-          echo "machine urs.earthdata.nasa.gov login ${{ secrets.EARTHDATA_USER }} password ${{ secrets.EARTHDATA_PASS }}" > ~/.netrc
-          echo "machine gpm1.gesdisc.eosdis.nasa.gov login ${{ secrets.EARTHDATA_USER }} password ${{ secrets.EARTHDATA_PASS }}" >> ~/.netrc
-          chmod 600 ~/.netrc
+        run: pip install requests xarray netCDF4 h5netcdf h5py matplotlib numpy
 
       - name: Run NASA Download & Processing Script
+        env:
+          EARTHDATA_USER: ${{ secrets.EARTHDATA_USER }}
+          EARTHDATA_PASS: ${{ secrets.EARTHDATA_PASS }}
         run: python update_imerg.py
 
       - name: Commit and Push Image to GitHub
