@@ -646,7 +646,7 @@
         });
 
         // ---------------------------------------------------------------------
-        // NASA IMERG SATELLITE LOGIC (FIXED RENDERING LAG)
+        // NASA IMERG SATELLITE LOGIC (FIXED)
         // ---------------------------------------------------------------------
         document.getElementById('toggle-satellite').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('satellite-legend');
@@ -654,8 +654,8 @@
                 legendDiv.style.display = 'block';
                 updateSatelliteData();
                 
-                // Set interval to poll for updates every 5 minutes
-                satelliteInterval = setInterval(updateSatelliteData, 5 * 60 * 1000);
+                // Set interval to poll for updates every 30 minutes
+                satelliteInterval = setInterval(updateSatelliteData, 30 * 60 * 1000);
             } else {
                 legendDiv.style.display = 'none';
                 if (satelliteLayer) map.removeLayer(satelliteLayer);
@@ -664,60 +664,49 @@
         });
 
         function updateSatelliteData() {
-            document.getElementById('satellite-time').textContent = "Fetching NASA data...";
+            // Because NASA GIBS processing lags behind real-time by about 4-6 hours,
+            // we manually compute a "Safe Time" exactly 6 hours ago to ensure images exist.
+            const now = new Date();
+            const safeTime = new Date(now.getTime() - (6 * 60 * 60 * 1000));
             
-            // Fetch 5 recent granules from CMR instead of just 1.
-            fetch('https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=5&sort_key=-start_date')
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.feed || !data.feed.entry || data.feed.entry.length === 0) {
-                        document.getElementById('satellite-time').textContent = "No data available.";
-                        return;
-                    }
-                    
-                    // We pick a slightly older entry (index 3 or the last one available) 
-                    // This accounts for GIBS tile rendering lag, preventing blank tiles!
-                    const safeEntryIndex = data.feed.entry.length > 3 ? 3 : data.feed.entry.length - 1;
-                    const safeEntry = data.feed.entry[safeEntryIndex];
-                    
-                    const latestTimeStr = safeEntry.time_start; 
-                    const dateObj = new Date(latestTimeStr);
-                    
-                    // Format appropriately for GIBS WMS (YYYY-MM-DDTHH:mm:00Z)
-                    const gibsTime = dateObj.toISOString().substring(0, 19) + 'Z';
-                    
-                    // Date output extraction
-                    const dateStr = dateObj.toISOString().split('T')[0];
-                    const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + ' UTC';
-                    
-                    // Malaysia Time (UTC +8) calculation
-                    const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
-                    const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
-                    
-                    document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
-                    
-                    if (satelliteLayer) {
-                        satelliteLayer.setParams({ time: gibsTime }, false); 
-                        if (!map.hasLayer(satelliteLayer)) {
-                            satelliteLayer.addTo(map);
-                        }
-                    } else {
-                        satelliteLayer = L.tileLayer.wms("https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi", {
-                            layers: 'GPM_3IMERGHHE_Precipitation_Rate',
-                            format: 'image/png',
-                            transparent: true,
-                            opacity: 0.65,
-                            version: '1.3.0',
-                            time: gibsTime,
-                            maxZoom: 20,
-                            bounds: [[-90, -180], [90, 180]]
-                        }).addTo(map);
-                    }
-                })
-                .catch(err => {
-                    console.error("NASA IMERG CMR Fetch Error:", err);
-                    document.getElementById('satellite-time').textContent = "Error parsing NASA Feed.";
-                });
+            // Round down to nearest 30 mins (IMERG is half-hourly)
+            const minutes = safeTime.getUTCMinutes();
+            safeTime.setUTCMinutes(minutes >= 30 ? 30 : 0);
+            safeTime.setUTCSeconds(0);
+            safeTime.setUTCMilliseconds(0);
+            
+            // Format for NASA GIBS WMS: YYYY-MM-DDTHH:mm:00Z
+            const gibsTime = safeTime.toISOString().substring(0, 19) + 'Z';
+            
+            // Extract formatted strings for the Legend Display
+            const dateStr = safeTime.toISOString().split('T')[0];
+            const utcStr = safeTime.toISOString().split('T')[1].substring(0, 5) + ' UTC';
+            
+            // Malaysia Time (UTC +8)
+            const mytDate = new Date(safeTime.getTime() + (8 * 60 * 60 * 1000));
+            const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
+            
+            // Update Legend UI
+            document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
+            
+            // Draw/Update the Layer
+            if (satelliteLayer) {
+                satelliteLayer.setParams({ time: gibsTime }, false); 
+                if (!map.hasLayer(satelliteLayer)) {
+                    satelliteLayer.addTo(map);
+                }
+            } else {
+                satelliteLayer = L.tileLayer.wms("https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi", {
+                    layers: 'GPM_3IMERGHHE_Precipitation_Rate',
+                    format: 'image/png',
+                    transparent: true,
+                    opacity: 0.65,
+                    version: '1.3.0',
+                    time: gibsTime,
+                    maxZoom: 20,
+                    bounds: [[-90, -180], [90, 180]]
+                }).addTo(map);
+            }
         }
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
