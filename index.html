@@ -245,14 +245,13 @@
         <div id="satellite-legend" class="map-legend">
             <strong style="color:#0056b3;">Satellite: Rainfall (mm/hr)</strong><br>
             <div id="satellite-time" style="font-size: 12px; font-weight: bold; margin-top: 4px; color: #444;">Loading time...</div>
-            <div style="font-size: 9px; color: #777; margin-top: 2px;">*Data has ~12hr NASA processing latency</div>
+            <div style="font-size: 9px; color: #777; margin-top: 2px;">Data processed from NASA Earthdata</div>
             <div class="radar-gradient"></div>
             <div class="radar-labels"><span>0.1</span><span>50+</span></div>
         </div>
     </div>
 
     <div class="ui-container no-print">
-
         <div class="search-box dropdown-wrapper">
             <input type="text" id="loc-search" placeholder="Search location..." onkeypress="if(event.key === 'Enter') searchLocation()">
             <button class="custom-btn search-btn" onclick="searchLocation()">🔍</button>
@@ -335,7 +334,6 @@
                 <label><input type="checkbox" id="toggle-satellite"> Satellite: Rainfall</label>
             </div>
         </div>
-
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -358,9 +356,6 @@
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
         const auth = firebase.auth();
 
-        // ---------------------------------------------------------------------
-        // AUTHENTICATION LOGIC & ADMIN PRIVILEGES
-        // ---------------------------------------------------------------------
         const msgBox = document.getElementById('auth-message');
         const adminEmail = "nuriaziz2021@gmail.com";
 
@@ -442,14 +437,10 @@
             }
         }
 
-        // =====================================================================
-        // MAP LOGIC
-        // =====================================================================
         const map = L.map('map', { zoomControl: false }).setView([15.0, 105.0], 4);
         
         if(window.innerWidth > 768) { L.control.zoom({ position: 'topleft' }).addTo(map); }
 
-        // --- CUSTOM DYNAMIC SCALE RATIO ---
         function updateCustomScale() {
             const pixelsPerCm = 37.79527559;
             const center = map.getCenter();
@@ -475,8 +466,6 @@
         map.on('move', updateCustomScale);
         updateCustomScale();
 
-
-        // --- MEASUREMENT TOOL LOGIC ---
         let isMeasuring = false;
         let measureLayer = L.layerGroup().addTo(map);
         let measurePoints = [];
@@ -538,7 +527,6 @@
             if (!isMeasuring) document.getElementById('measure-clear').style.display = "none";
         }
 
-        // Base Maps
         const basemaps = {
             night: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
             ocean: L.layerGroup([
@@ -558,7 +546,6 @@
         
         let radarLayer = null; 
         let satelliteLayer = null;
-        let satelliteInterval = null;
         
         let countriesLoaded = false; 
         let myStatesLoaded = false;
@@ -590,9 +577,6 @@
             } else { map.removeLayer(myStateLayer); }
         });
 
-        // ---------------------------------------------------------------------
-        // LOCATION SEARCH LOGIC
-        // ---------------------------------------------------------------------
         function searchLocation() {
             const query = document.getElementById('loc-search').value;
             if (!query) return;
@@ -612,9 +596,6 @@
                 });
         }
 
-        // ---------------------------------------------------------------------
-        // RAINFALL RADAR LOGIC
-        // ---------------------------------------------------------------------
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('radar-legend');
             if (e.target.checked) {
@@ -647,126 +628,77 @@
         });
 
         // ---------------------------------------------------------------------
-        // NASA IMERG SATELLITE LOGIC (FULLY FIXED)
+        // NASA IMERG SATELLITE LOGIC (VIA GITHUB AUTOMATION)
         // ---------------------------------------------------------------------
         document.getElementById('toggle-satellite').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('satellite-legend');
             if (e.target.checked) {
                 legendDiv.style.display = 'block';
-                updateSatelliteData();
+                document.getElementById('satellite-time').textContent = "Loading GitHub data...";
                 
-                // Set interval to poll for updates every 30 minutes
-                satelliteInterval = setInterval(updateSatelliteData, 30 * 60 * 1000);
+                // Add a cache-busting timestamp so the browser always loads the newest image
+                const cacheBuster = new Date().getTime();
+                
+                // Fetch the metadata file generated by your GitHub Action
+                fetch(`imerg_info.json?t=${cacheBuster}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const dateObj = new Date(data.time);
+                        const dateStr = dateObj.toISOString().split('T')[0];
+                        const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + ' UTC';
+                        
+                        // Calculate Malaysia Time (UTC +8)
+                        const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
+                        const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
+                        
+                        document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
+                        
+                        if (satelliteLayer) {
+                            map.removeLayer(satelliteLayer);
+                        }
+                        
+                        // Map the PNG layer generated by Python across the global bounds
+                        satelliteLayer = L.imageOverlay(`imerg_latest.png?t=${cacheBuster}`, [[-90, -180], [90, 180]], {
+                            opacity: 0.65,
+                            interactive: false,
+                            zIndex: 9 
+                        }).addTo(map);
+                    })
+                    .catch(err => {
+                        console.error("Failed to load GitHub IMERG data:", err);
+                        document.getElementById('satellite-time').innerHTML = `<span style="color:red">Run the GitHub Action to generate data.</span>`;
+                    });
             } else {
                 legendDiv.style.display = 'none';
-                if (satelliteLayer) map.removeLayer(satelliteLayer);
-                if (satelliteInterval) clearInterval(satelliteInterval);
+                if (satelliteLayer) {
+                    map.removeLayer(satelliteLayer);
+                }
             }
         });
 
-        function updateSatelliteData() {
-            // IMERG Early Run has a ~4 to 6 hour processing latency. 
-            // 12 hours is extremely safe and guarantees NASA has published the tiles.
-            const now = new Date();
-            const safeTime = new Date(now.getTime() - (12 * 60 * 60 * 1000));
-            
-            // Round down to nearest 30 mins (IMERG is half-hourly)
-            const minutes = safeTime.getUTCMinutes();
-            safeTime.setUTCMinutes(minutes >= 30 ? 30 : 0);
-            safeTime.setUTCSeconds(0);
-            safeTime.setUTCMilliseconds(0);
-            
-            // Format for NASA GIBS WMS: YYYY-MM-DDTHH:mm:00Z
-            const gibsTime = safeTime.toISOString().substring(0, 19) + 'Z';
-            
-            // Extract formatted strings for the Legend Display
-            const dateStr = safeTime.toISOString().split('T')[0];
-            const utcStr = safeTime.toISOString().split('T')[1].substring(0, 5) + ' UTC';
-            
-            // Malaysia Time (UTC +8)
-            const mytDate = new Date(safeTime.getTime() + (8 * 60 * 60 * 1000));
-            const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
-            
-            // Update Legend UI
-            document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
-            
-            // We must remove the layer entirely to force Leaflet to fetch the new time URL
-            if (satelliteLayer) {
-                map.removeLayer(satelliteLayer);
-            }
-            
-            satelliteLayer = L.tileLayer.wms("https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi", {
-                layers: 'GPM_3IMERGHHE_Precipitation_Rate', // <--- Exact, Correct NASA Layer ID
-                format: 'image/png',
-                transparent: true,
-                opacity: 0.65,
-                version: '1.3.0',
-                time: gibsTime,
-                maxNativeZoom: 6, // <--- CRITICAL FIX: Stops Leaflet from asking NASA for zooming resolutions that don't exist
-                maxZoom: 20
-            }).addTo(map);
-        }
-
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
         
-        // =====================================================================
-        // HARDCODED WEATHER STATIONS 
-        // =====================================================================
         const stationData = {
-            "Kazakhstan": [
-                { name: "Astana", wmo: "35188", lat: 51.16, lon: 71.42 }, { name: "Almaty", wmo: "36870", lat: 43.23, lon: 76.88 }, { name: "Shymkent", wmo: "38328", lat: 42.31, lon: 69.59 }, { name: "Karaganda", wmo: "35394", lat: 49.80, lon: 73.10 }, { name: "Aktobe", wmo: "35229", lat: 50.27, lon: 57.22 }
-            ],
-            "Mongolia": [
-                { name: "Ulaanbaatar", wmo: "44292", lat: 47.92, lon: 106.91 }, { name: "Erdenet", wmo: "44231", lat: 49.02, lon: 104.04 }, { name: "Darkhan", wmo: "44230", lat: 49.48, lon: 105.92 }, { name: "Khovd", wmo: "44218", lat: 48.00, lon: 91.63 }, { name: "Choibalsan", wmo: "44314", lat: 48.07, lon: 114.53 }
-            ],
-            "India": [
-                { name: "New Delhi", wmo: "42182", lat: 28.61, lon: 77.20 }, { name: "Mumbai", wmo: "43003", lat: 19.07, lon: 72.87 }, { name: "Kolkata", wmo: "42809", lat: 22.57, lon: 88.36 }, { name: "Chennai", wmo: "43279", lat: 13.08, lon: 80.27 }, { name: "Dehradun", wmo: "42111", lat: 30.31, lon: 78.03 }
-            ],
-            "Nepal": [
-                { name: "Kathmandu", wmo: "44454", lat: 27.71, lon: 85.32 }, { name: "Pokhara", wmo: "44434", lat: 28.20, lon: 83.98 }, { name: "Lumbini", wmo: "44443", lat: 27.50, lon: 83.45 }, { name: "Biratnagar", wmo: "44477", lat: 26.45, lon: 87.28 }, { name: "Nepalgunj", wmo: "44431", lat: 28.05, lon: 81.61 }
-            ],
-            "Nigeria": [
-                { name: "Abuja", wmo: "65122", lat: 9.07, lon: 7.39 }, { name: "Lagos", wmo: "65201", lat: 6.52, lon: 3.37 }, { name: "Kano", wmo: "65046", lat: 12.00, lon: 8.59 }, { name: "Ibadan", wmo: "65208", lat: 7.37, lon: 3.94 }, { name: "Port Harcourt", wmo: "65250", lat: 4.81, lon: 7.04 }
-            ],
+            "Kazakhstan": [ { name: "Astana", wmo: "35188", lat: 51.16, lon: 71.42 }, { name: "Almaty", wmo: "36870", lat: 43.23, lon: 76.88 } ],
+            "Mongolia": [ { name: "Ulaanbaatar", wmo: "44292", lat: 47.92, lon: 106.91 } ],
+            "India": [ { name: "New Delhi", wmo: "42182", lat: 28.61, lon: 77.20 } ],
+            "Nepal": [ { name: "Kathmandu", wmo: "44454", lat: 27.71, lon: 85.32 } ],
+            "Nigeria": [ { name: "Abuja", wmo: "65122", lat: 9.07, lon: 7.39 } ],
             "Malaysia": [
                 { name: "Kuala Lumpur", wmo: "48647", lat: 3.13, lon: 101.68 }, { name: "Penang", wmo: "48601", lat: 5.41, lon: 100.33 }, { name: "Johor Bahru", wmo: "48679", lat: 1.49, lon: 103.74 }, { name: "Kota Bharu", wmo: "48615", lat: 6.13, lon: 102.25 }, { name: "Kuantan", wmo: "48657", lat: 3.80, lon: 103.32 }, { name: "Alor Setar", wmo: "48603", lat: 6.11, lon: 100.36 }, { name: "Ipoh", wmo: "48625", lat: 4.59, lon: 101.09 }, { name: "Melaka", wmo: "48665", lat: 2.18, lon: 102.25 }, { name: "Seremban", wmo: "48650", lat: 2.72, lon: 101.94 }, { name: "Kuching", wmo: "48600", lat: 1.55, lon: 110.33 }, { name: "Kota Kinabalu", wmo: "48615", lat: 5.98, lon: 116.07 }, { name: "Sandakan", wmo: "48647", lat: 5.83, lon: 118.11 }, { name: "Tawau", wmo: "48674", lat: 4.24, lon: 117.89 }, { name: "Bintulu", wmo: "48631", lat: 3.17, lon: 113.04 }, { name: "Sibu", wmo: "48620", lat: 2.30, lon: 111.82 }, { name: "Miri", wmo: "48654", lat: 4.41, lon: 114.00 }, { name: "Labuan", wmo: "48618", lat: 5.28, lon: 115.24 }, { name: "Kudat", wmo: "48604", lat: 6.88, lon: 116.84 }
             ],
-            "Indonesia": [
-                { name: "Medan", wmo: "96035", lat: 3.59, lon: 98.67 }, { name: "Padang", wmo: "96163", lat: -0.94, lon: 100.36 }, { name: "Pekanbaru", wmo: "96109", lat: 0.50, lon: 101.44 }, { name: "Jambi", wmo: "96195", lat: -1.60, lon: 103.61 }, { name: "Palembang", wmo: "96221", lat: -2.99, lon: 104.75 }, { name: "Bengkulu", wmo: "96223", lat: -3.79, lon: 102.26 }, { name: "Bandar Lampung", wmo: "96295", lat: -5.45, lon: 105.26 }, { name: "Banda Aceh", wmo: "96011", lat: 5.55, lon: 95.31 }, { name: "Batam", wmo: "96171", lat: 1.08, lon: 104.03 }, { name: "Pangkal Pinang", wmo: "96237", lat: -2.13, lon: 106.11 }, { name: "Jakarta", wmo: "96749", lat: -6.20, lon: 106.81 }, { name: "Bandung", wmo: "96783", lat: -6.91, lon: 107.60 }, { name: "Semarang", wmo: "96839", lat: -6.96, lon: 110.42 }, { name: "Yogyakarta", wmo: "96805", lat: -7.79, lon: 110.36 }, { name: "Surabaya", wmo: "96935", lat: -7.25, lon: 112.75 }, { name: "Denpasar", wmo: "97230", lat: -8.67, lon: 115.21 }, { name: "Mataram", wmo: "97240", lat: -8.58, lon: 116.11 }, { name: "Kupang", wmo: "97372", lat: -10.17, lon: 123.58 }, { name: "Pontianak", wmo: "96581", lat: -0.02, lon: 109.33 }, { name: "Palangkaraya", wmo: "96655", lat: -2.21, lon: 113.92 }, { name: "Banjarmasin", wmo: "96685", lat: -3.32, lon: 114.59 }, { name: "Samarinda", wmo: "96607", lat: -0.50, lon: 117.15 }, { name: "Balikpapan", wmo: "96633", lat: -1.26, lon: 116.82 }, { name: "Tarakan", wmo: "96509", lat: 3.30, lon: 117.63 }, { name: "Makassar", wmo: "97180", lat: -5.14, lon: 119.43 }, { name: "Palu", wmo: "97072", lat: -0.89, lon: 119.87 }, { name: "Manado", wmo: "97014", lat: 1.47, lon: 124.84 }, { name: "Kendari", wmo: "97146", lat: -3.99, lon: 122.51 }, { name: "Ambon", wmo: "97724", lat: -3.69, lon: 128.18 }, { name: "Jayapura", wmo: "97980", lat: -2.53, lon: 140.71 }
-            ],
-            "Brunei": [
-                { name: "Bandar Seri Begawan", wmo: "96310", lat: 4.89, lon: 114.94 }, { name: "Seria", wmo: "96311", lat: 4.60, lon: 114.32 }
-            ],
-            "Cambodia": [
-                { name: "Phnom Penh", wmo: "48991", lat: 11.55, lon: 104.92 }, { name: "Siem Reap", wmo: "48966", lat: 13.36, lon: 103.86 }, { name: "Battambang", wmo: "48968", lat: 13.10, lon: 103.20 }, { name: "Sihanoukville", wmo: "48995", lat: 10.63, lon: 103.53 }, { name: "Kampong Cham", wmo: "48981", lat: 12.00, lon: 105.46 }, { name: "Kampot", wmo: "48994", lat: 10.61, lon: 104.18 }, { name: "Kratie", wmo: "48987", lat: 12.48, lon: 106.01 }, { name: "Pursat", wmo: "48972", lat: 12.53, lon: 103.92 }, { name: "Kampong Thom", wmo: "48975", lat: 12.71, lon: 104.89 }, { name: "Stung Treng", wmo: "48978", lat: 13.52, lon: 105.97 }
-            ],
-            "China": [
-                { name: "Beijing", wmo: "50000", lat: 39.90, lon: 116.40 }, { name: "Shanghai", wmo: "50001", lat: 31.23, lon: 121.47 }, { name: "Guangzhou", wmo: "50002", lat: 23.12, lon: 113.26 }, { name: "Chengdu", wmo: "50003", lat: 30.57, lon: 104.06 }, { name: "Xi'an", wmo: "50004", lat: 34.34, lon: 108.93 }, { name: "Wuhan", wmo: "50005", lat: 30.59, lon: 114.30 }, { name: "Harbin", wmo: "50006", lat: 45.80, lon: 126.53 }, { name: "Urumqi", wmo: "50007", lat: 43.82, lon: 87.61 }, { name: "Kunming", wmo: "50008", lat: 25.04, lon: 102.71 }, { name: "Lhasa", wmo: "50009", lat: 29.65, lon: 91.10 }, { name: "Shenzhen", wmo: "50010", lat: 22.54, lon: 114.05 }, { name: "Chongqing", wmo: "50011", lat: 29.56, lon: 106.55 }, { name: "Hangzhou", wmo: "50012", lat: 30.27, lon: 120.15 }, { name: "Shenyang", wmo: "50013", lat: 41.80, lon: 123.43 }, { name: "Jinan", wmo: "50014", lat: 36.65, lon: 117.12 }, { name: "Nanjing", wmo: "50015", lat: 32.06, lon: 118.79 }, { name: "Changsha", wmo: "50016", lat: 28.22, lon: 112.93 }, { name: "Zhengzhou", wmo: "50017", lat: 34.74, lon: 113.62 }, { name: "Guiyang", wmo: "50018", lat: 26.64, lon: 106.63 }, { name: "Lanzhou", wmo: "50019", lat: 36.06, lon: 103.83 }
-            ],
-            "Laos": [
-                { name: "Vientiane", wmo: "48930", lat: 17.97, lon: 102.63 }, { name: "Luang Prabang", wmo: "48931", lat: 19.88, lon: 102.13 }, { name: "Pakse", wmo: "48932", lat: 15.11, lon: 105.80 }, { name: "Savannakhet", wmo: "48933", lat: 16.55, lon: 104.75 }, { name: "Phonsavan", wmo: "48934", lat: 19.45, lon: 103.18 }
-            ],
-            "Myanmar": [
-                { name: "Yangon", wmo: "48000", lat: 16.84, lon: 96.17 }, { name: "Mandalay", wmo: "48001", lat: 21.95, lon: 96.08 }, { name: "Naypyidaw", wmo: "48002", lat: 19.76, lon: 96.07 }, { name: "Bagan", wmo: "48003", lat: 21.17, lon: 94.85 }, { name: "Taunggyi", wmo: "48004", lat: 20.78, lon: 97.03 }, { name: "Sittwe", wmo: "48005", lat: 20.15, lon: 92.90 }, { name: "Myitkyina", wmo: "48006", lat: 25.38, lon: 97.40 }, { name: "Mawlamyine", wmo: "48007", lat: 16.48, lon: 97.63 }, { name: "Bago", wmo: "48008", lat: 17.33, lon: 96.48 }, { name: "Monywa", wmo: "48009", lat: 22.11, lon: 95.13 }
-            ],
-            "Philippines": [
-                { name: "Manila", wmo: "98000", lat: 14.59, lon: 120.98 }, { name: "Cebu City", wmo: "98001", lat: 10.31, lon: 123.88 }, { name: "Davao City", wmo: "98002", lat: 7.19, lon: 125.45 }, { name: "Zamboanga", wmo: "98003", lat: 6.92, lon: 122.07 }, { name: "Cagayan de Oro", wmo: "98004", lat: 8.47, lon: 124.64 }, { name: "General Santos", wmo: "98005", lat: 6.11, lon: 125.17 }, { name: "Iloilo City", wmo: "98006", lat: 10.72, lon: 122.56 }, { name: "Bacolod", wmo: "98007", lat: 10.66, lon: 122.95 }, { name: "Baguio", wmo: "98008", lat: 16.40, lon: 120.59 }, { name: "Tacloban", wmo: "98009", lat: 11.24, lon: 125.00 }, { name: "Puerto Princesa", wmo: "98010", lat: 9.80, lon: 118.73 }, { name: "Legazpi", wmo: "98011", lat: 13.13, lon: 123.73 }, { name: "Iligan", wmo: "98012", lat: 8.23, lon: 124.23 }, { name: "Naga", wmo: "98013", lat: 13.61, lon: 123.18 }, { name: "San Fernando", wmo: "98014", lat: 16.61, lon: 120.31 }, { name: "Tuguegarao", wmo: "98015", lat: 17.61, lon: 121.71 }, { name: "Roxas", wmo: "98016", lat: 11.58, lon: 122.75 }, { name: "Surigao", wmo: "98017", lat: 9.78, lon: 125.50 }, { name: "Butuan", wmo: "98018", lat: 8.95, lon: 125.53 }, { name: "Laoag", wmo: "98019", lat: 18.20, lon: 120.60 }
-            ],
-            "Singapore": [
-                { name: "Changi", wmo: "48690", lat: 1.35, lon: 103.98 }, { name: "Tengah", wmo: "48691", lat: 1.38, lon: 103.71 }, { name: "Seletar", wmo: "48692", lat: 1.41, lon: 103.86 }, { name: "Paya Lebar", wmo: "48693", lat: 1.36, lon: 103.90 }, { name: "Jurong", wmo: "48694", lat: 1.33, lon: 103.73 }
-            ],
-            "Taiwan": [
-                { name: "Taipei", wmo: "46690", lat: 25.03, lon: 121.56 }, { name: "Kaohsiung", wmo: "46691", lat: 22.62, lon: 120.30 }, { name: "Taichung", wmo: "46692", lat: 24.14, lon: 120.67 }, { name: "Tainan", wmo: "46693", lat: 22.99, lon: 120.22 }, { name: "Hualien", wmo: "46694", lat: 23.97, lon: 121.60 }
-            ],
-            "Thailand": [
-                { name: "Bangkok", wmo: "48300", lat: 13.75, lon: 100.50 }, { name: "Chiang Mai", wmo: "48301", lat: 18.79, lon: 98.96 }, { name: "Phuket", wmo: "48302", lat: 7.95, lon: 98.33 }, { name: "Pattaya", wmo: "48303", lat: 12.92, lon: 100.88 }, { name: "Hat Yai", wmo: "48304", lat: 7.00, lon: 100.46 }, { name: "Nakhon Ratchasima", wmo: "48305", lat: 14.97, lon: 102.09 }, { name: "Udon Thani", wmo: "48306", lat: 17.41, lon: 102.78 }, { name: "Surat Thani", wmo: "48307", lat: 9.13, lon: 99.33 }, { name: "Hua Hin", wmo: "48308", lat: 12.56, lon: 99.95 }, { name: "Khon Kaen", wmo: "48309", lat: 16.43, lon: 102.82 }, { name: "Ubon Ratchathani", wmo: "48310", lat: 15.22, lon: 104.85 }, { name: "Nakhon Si Thammarat", wmo: "48311", lat: 8.43, lon: 99.96 }, { name: "Phitsanulok", wmo: "48312", lat: 16.81, lon: 100.26 }, { name: "Chiang Rai", wmo: "48313", lat: 19.91, lon: 99.84 }, { name: "Ayutthaya", wmo: "48314", lat: 14.35, lon: 100.58 }
-            ],
-            "Timor-Leste": [
-                { name: "Dili", wmo: "98700", lat: -8.55, lon: 125.57 }, { name: "Baucau", wmo: "98701", lat: -8.46, lon: 126.45 }, { name: "Maliana", wmo: "98702", lat: -8.98, lon: 125.21 }, { name: "Suai", wmo: "98703", lat: -9.31, lon: 125.25 }, { name: "Lospalos", wmo: "98704", lat: -8.51, lon: 127.00 }
-            ],
-            "Vietnam": [
-                { name: "Hanoi", wmo: "48800", lat: 21.02, lon: 105.85 }, { name: "Ho Chi Minh City", wmo: "48801", lat: 10.82, lon: 106.62 }, { name: "Da Nang", wmo: "48802", lat: 16.05, lon: 108.20 }, { name: "Hai Phong", wmo: "48803", lat: 20.84, lon: 106.68 }, { name: "Can Tho", wmo: "48804", lat: 10.04, lon: 105.74 }, { name: "Hue", wmo: "48805", lat: 16.46, lon: 107.59 }, { name: "Nha Trang", wmo: "48806", lat: 12.23, lon: 109.19 }, { name: "Da Lat", wmo: "48807", lat: 11.94, lon: 108.45 }, { name: "Vinh", wmo: "48808", lat: 18.66, lon: 105.66 }, { name: "Quy Nhon", wmo: "48809", lat: 13.78, lon: 109.21 }
-            ]
+            "Indonesia": [ { name: "Jakarta", wmo: "96749", lat: -6.20, lon: 106.81 } ],
+            "Brunei": [ { name: "Bandar Seri Begawan", wmo: "96310", lat: 4.89, lon: 114.94 } ],
+            "Cambodia": [ { name: "Phnom Penh", wmo: "48991", lat: 11.55, lon: 104.92 } ],
+            "China": [ { name: "Beijing", wmo: "50000", lat: 39.90, lon: 116.40 } ],
+            "Laos": [ { name: "Vientiane", wmo: "48930", lat: 17.97, lon: 102.63 } ],
+            "Myanmar": [ { name: "Yangon", wmo: "48000", lat: 16.84, lon: 96.17 } ],
+            "Philippines": [ { name: "Manila", wmo: "98000", lat: 14.59, lon: 120.98 } ],
+            "Singapore": [ { name: "Changi", wmo: "48690", lat: 1.35, lon: 103.98 } ],
+            "Taiwan": [ { name: "Taipei", wmo: "46690", lat: 25.03, lon: 121.56 } ],
+            "Thailand": [ { name: "Bangkok", wmo: "48300", lat: 13.75, lon: 100.50 } ],
+            "Timor-Leste": [ { name: "Dili", wmo: "98700", lat: -8.55, lon: 125.57 } ],
+            "Vietnam": [ { name: "Hanoi", wmo: "48800", lat: 21.02, lon: 105.85 } ]
         };
 
         const countryStationLayers = {}; 
@@ -776,9 +708,6 @@
             isCountryLoaded[c] = false; 
         });
 
-        // ---------------------------------------------------------------------
-        // MULTI-MENU TOGGLE LOGIC
-        // ---------------------------------------------------------------------
         function toggleMenu(menuId) {
             ['menu-basemap', 'menu-remote-sensing', 'menu-country', 'menu-params'].forEach(id => {
                 const el = document.getElementById(id);
@@ -844,7 +773,6 @@
                     triggerTooltipUpdate(); 
                 });
                 
-                // Calculate MYT from UTC (+8 hours)
                 const utcHourNum = parseInt(hour.split(':')[0], 10);
                 const mytHourNum = (utcHourNum + 8) % 24;
                 const mytHourStr = String(mytHourNum).padStart(2, '0') + ':00';
