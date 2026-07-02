@@ -8,6 +8,12 @@ import matplotlib
 matplotlib.use('Agg') # Prevents display errors in headless servers
 import matplotlib.pyplot as plt
 
+# --- FIX FOR GITHUB ACTIONS IPv6 BUG WITH NASA ---
+import socket
+import urllib3.util.connection as urllib3_cn
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
+# -------------------------------------------------
+
 user = os.environ.get('EARTHDATA_USER')
 password = os.environ.get('EARTHDATA_PASS')
 
