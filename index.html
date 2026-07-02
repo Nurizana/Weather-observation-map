@@ -146,7 +146,7 @@
         .map-legend { 
             background: rgba(255, 255, 255, 0.95); padding: 10px 15px; border-radius: 5px; 
             border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: none; 
-            font-size: 13px; color: #333; width: 190px; 
+            font-size: 13px; color: #333; width: 200px; 
         }
 
         .radar-gradient { height: 10px; width: 100%; margin-top: 8px; border-radius: 2px; background: linear-gradient(to right, #00ffff, #0000ff, #00ff00, #ffff00, #ffaa00, #ff0000, #ff00ff); }
@@ -245,6 +245,7 @@
         <div id="satellite-legend" class="map-legend">
             <strong style="color:#0056b3;">Satellite: Rainfall (mm/hr)</strong><br>
             <div id="satellite-time" style="font-size: 12px; font-weight: bold; margin-top: 4px; color: #444;">Loading time...</div>
+            <div style="font-size: 9px; color: #777; margin-top: 2px;">*Data has ~18hr NASA processing latency</div>
             <div class="radar-gradient"></div>
             <div class="radar-labels"><span>0.1</span><span>50+</span></div>
         </div>
@@ -664,10 +665,11 @@
         });
 
         function updateSatelliteData() {
-            // Because NASA GIBS processing lags behind real-time by about 4-6 hours,
-            // we manually compute a "Safe Time" exactly 6 hours ago to ensure images exist.
+            // Because NASA GIBS processing relies on vast satellite constellations, 
+            // the pipeline to draw these map tiles can lag behind real-time by up to 14-18 hours.
+            // We manually step back exactly 18 hours to guarantee NASA has published the tiles, preventing a blank map.
             const now = new Date();
-            const safeTime = new Date(now.getTime() - (6 * 60 * 60 * 1000));
+            const safeTime = new Date(now.getTime() - (18 * 60 * 60 * 1000));
             
             // Round down to nearest 30 mins (IMERG is half-hourly)
             const minutes = safeTime.getUTCMinutes();
@@ -697,14 +699,13 @@
                 }
             } else {
                 satelliteLayer = L.tileLayer.wms("https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi", {
-                    layers: 'IMERG_Precipitation_Rate', // FIX APPLIED HERE
+                    layers: 'IMERG_Precipitation_Rate',
                     format: 'image/png',
                     transparent: true,
                     opacity: 0.65,
                     version: '1.3.0',
                     time: gibsTime,
-                    maxZoom: 20,
-                    bounds: [[-90, -180], [90, 180]]
+                    maxZoom: 20
                 }).addTo(map);
             }
         }
