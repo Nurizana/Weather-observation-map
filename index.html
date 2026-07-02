@@ -265,13 +265,6 @@
         </div>
 
         <div class="dropdown-wrapper">
-            <button class="custom-btn" onclick="toggleMenu('menu-remote-sensing')">Remote Sensing <span>▼</span></button>
-            <div id="menu-remote-sensing" class="menu-panel narrow">
-                <label><input type="checkbox" id="toggle-radar"> Rainfall Radar</label>
-            </div>
-        </div>
-
-        <div class="dropdown-wrapper">
             <button class="custom-btn" onclick="toggleMenu('menu-country')">Country List <span>▼</span></button>
             <div id="menu-country" class="menu-panel narrow">
                 <label><input type="checkbox" class="country-toggle" value="Brunei"> Brunei (2)</label>
@@ -317,6 +310,14 @@
                 </div>
             </div>
         </div>
+        
+        <div class="dropdown-wrapper">
+            <button class="custom-btn" onclick="toggleMenu('menu-remote-sensing')">Remote Sensing <span>▼</span></button>
+            <div id="menu-remote-sensing" class="menu-panel narrow">
+                <label><input type="checkbox" id="toggle-radar"> Rainfall Radar</label>
+            </div>
+        </div>
+
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
