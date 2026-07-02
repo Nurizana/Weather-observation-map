@@ -1,0 +1,40 @@
+name: Fetch NASA IMERG Data
+
+on:
+  schedule:
+    - cron: '0 */3 * * *' # Runs automatically every 3 hours
+  workflow_dispatch: # Allows you to click a button to run it manually
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Python GIS Libraries
+        run: pip install requests xarray netCDF4 h5netcdf matplotlib numpy
+
+      - name: Configure NASA Authentication
+        run: |
+          echo "machine urs.earthdata.nasa.gov login ${{ secrets.EARTHDATA_USER }} password ${{ secrets.EARTHDATA_PASS }}" > ~/.netrc
+          echo "machine gpm1.gesdisc.eosdis.nasa.gov login ${{ secrets.EARTHDATA_USER }} password ${{ secrets.EARTHDATA_PASS }}" >> ~/.netrc
+          chmod 600 ~/.netrc
+
+      - name: Run NASA Download & Processing Script
+        run: python update_imerg.py
+
+      - name: Commit and Push Image to GitHub
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add imerg_latest.png imerg_info.json
+          git commit -m "Automated IMERG Satellite Update" || echo "No changes to commit"
+          git push
