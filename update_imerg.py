@@ -28,7 +28,7 @@ if not response.ok:
 data = response.json()
 granule = data['feed']['entry'][0]
 
-# Extract the download link (Looking for NASA's new .HDF5 format)
+# Extract the download link
 links = granule['links']
 download_url = None
 for link in links:
@@ -38,7 +38,7 @@ for link in links:
         break
 
 if not download_url:
-    print("Error: Could not find a valid data download link (.HDF5 or .nc4).")
+    print("Error: Could not find a valid data download link.")
     print("Available links:", [l.get('href') for l in links])
     sys.exit(1)
 
@@ -63,11 +63,15 @@ with requests.Session() as s:
 
 print("3. Processing satellite data into map image...")
 try:
-    # Use h5netcdf engine specifically for NASA's new HDF5 format
-    ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf")
-except Exception as e:
-    print(f"Error opening file. Details: {e}")
-    sys.exit(1)
+    # FIX: NASA V07 hides the data inside a group called 'Grid'
+    ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf", group="Grid")
+except Exception:
+    # Fallback to root just in case they revert it
+    try:
+        ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf")
+    except Exception as e:
+        print(f"Error opening file. Details: {e}")
+        sys.exit(1)
 
 # Extract precipitation
 if 'precipitation' in ds:
