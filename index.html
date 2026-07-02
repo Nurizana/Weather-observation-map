@@ -236,14 +236,14 @@
 
     <div id="legend-container" class="no-print">
         <div id="radar-legend" class="map-legend">
-            <strong style="color:#0056b3;">Rainfall Radar (mm/hr)</strong><br>
+            <strong style="color:#0056b3;">Radar: Rainfall (mm/hr)</strong><br>
             <div id="radar-time" style="font-size: 12px; font-weight: bold; margin-top: 4px; color: #444;">Loading time...</div>
             <div class="radar-gradient"></div>
             <div class="radar-labels"><span>Light</span><span>Heavy</span></div>
         </div>
         
         <div id="satellite-legend" class="map-legend">
-            <strong style="color:#0056b3;">NASA IMERG (mm/hr)</strong><br>
+            <strong style="color:#0056b3;">Satellite: Rainfall (mm/hr)</strong><br>
             <div id="satellite-time" style="font-size: 12px; font-weight: bold; margin-top: 4px; color: #444;">Loading time...</div>
             <div class="radar-gradient"></div>
             <div class="radar-labels"><span>0.1</span><span>50+</span></div>
@@ -330,8 +330,8 @@
         <div class="dropdown-wrapper">
             <button class="custom-btn" onclick="toggleMenu('menu-remote-sensing')">Remote Sensing <span>▼</span></button>
             <div id="menu-remote-sensing" class="menu-panel narrow">
-                <label><input type="checkbox" id="toggle-radar"> Rainfall Radar</label>
-                <label><input type="checkbox" id="toggle-satellite"> NASA IMERG Satellite</label>
+                <label><input type="checkbox" id="toggle-radar"> Radar: Rainfall</label>
+                <label><input type="checkbox" id="toggle-satellite"> Satellite: Rainfall</label>
             </div>
         </div>
 
@@ -646,7 +646,7 @@
         });
 
         // ---------------------------------------------------------------------
-        // NASA IMERG SATELLITE LOGIC
+        // NASA IMERG SATELLITE LOGIC (FIXED RENDERING LAG)
         // ---------------------------------------------------------------------
         document.getElementById('toggle-satellite').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('satellite-legend');
@@ -666,8 +666,8 @@
         function updateSatelliteData() {
             document.getElementById('satellite-time').textContent = "Fetching NASA data...";
             
-            // Ping NASA CMR API for the most recent IMERG Early run granule (GPM_3IMERGHHE)
-            fetch('https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=1&sort_key=-start_date')
+            // Fetch 5 recent granules from CMR instead of just 1.
+            fetch('https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=5&sort_key=-start_date')
                 .then(res => res.json())
                 .then(data => {
                     if (!data.feed || !data.feed.entry || data.feed.entry.length === 0) {
@@ -675,7 +675,12 @@
                         return;
                     }
                     
-                    const latestTimeStr = data.feed.entry[0].time_start; 
+                    // We pick a slightly older entry (index 3 or the last one available) 
+                    // This accounts for GIBS tile rendering lag, preventing blank tiles!
+                    const safeEntryIndex = data.feed.entry.length > 3 ? 3 : data.feed.entry.length - 1;
+                    const safeEntry = data.feed.entry[safeEntryIndex];
+                    
+                    const latestTimeStr = safeEntry.time_start; 
                     const dateObj = new Date(latestTimeStr);
                     
                     // Format appropriately for GIBS WMS (YYYY-MM-DDTHH:mm:00Z)
@@ -692,18 +697,18 @@
                     document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
                     
                     if (satelliteLayer) {
-                        satelliteLayer.setParams({ TIME: gibsTime }, false); // Prevent resetting unrelated parameters
+                        satelliteLayer.setParams({ time: gibsTime }, false); 
                         if (!map.hasLayer(satelliteLayer)) {
                             satelliteLayer.addTo(map);
                         }
                     } else {
                         satelliteLayer = L.tileLayer.wms("https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi", {
-                            layers: 'GPM_3IMERGHH_Precipitation_Rate',
+                            layers: 'GPM_3IMERGHHE_Precipitation_Rate',
                             format: 'image/png',
                             transparent: true,
                             opacity: 0.65,
                             version: '1.3.0',
-                            TIME: gibsTime,
+                            time: gibsTime,
                             maxZoom: 20,
                             bounds: [[-90, -180], [90, 180]]
                         }).addTo(map);
