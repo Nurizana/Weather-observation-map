@@ -1,49 +1,90 @@
-import requests
-import json
-import xarray as xr
-import matplotlib.pyplot as plt
-import numpy as np
 import os
+import sys
+import json
+import requests
+import xarray as xr
+import numpy as np
+import matplotlib
+matplotlib.use('Agg') # Prevents display errors in headless servers
+import matplotlib.pyplot as plt
 
-print("Querying NASA CMR for the latest IMERG Early Run data...")
+user = os.environ.get('EARTHDATA_USER')
+password = os.environ.get('EARTHDATA_PASS')
+
+print("1. Querying NASA CMR for the latest IMERG Early Run data...")
 cmr_url = "https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=1&sort_key=-start_date"
-response = requests.get(cmr_url).json()
-granule = response['feed']['entry'][0]
+response = requests.get(cmr_url)
 
-# Extract the NetCDF download link and the timestamp
+if not response.ok:
+    print(f"Failed to reach NASA CMR: {response.text}")
+    sys.exit(1)
+
+data = response.json()
+granule = data['feed']['entry'][0]
+
+# Extract the download link (Updated to look for NASA's new .HDF5 format)
 links = granule['links']
-download_url = next(link['href'] for link in links if link['href'].endswith('.nc4'))
+download_url = None
+for link in links:
+    href = link.get('href', '')
+    if href.endswith('.HDF5') or href.endswith('.nc4') or href.endswith('.h5'):
+        download_url = href
+        break
+
+if not download_url:
+    print("Error: Could not find a valid data download link (.HDF5 or .nc4).")
+    print("Available links:", [l.get('href') for l in links])
+    sys.exit(1)
+
 start_time = granule['time_start']
 
-print(f"Downloading: {download_url}")
+print(f"2. Downloading: {download_url}")
+
+# NASA uses a redirect system for logins.
 with requests.Session() as s:
-    r = s.get(download_url)
-    with open("imerg.nc4", "wb") as f:
-        f.write(r.content)
+    s.auth = (user, password)
+    r1 = s.request('get', download_url)
+    r = s.get(r1.url, auth=(user, password))
+    
+    if r.ok:
+        with open("imerg_data.hdf5", "wb") as f:
+            f.write(r.content)
+        print("Download successful!")
+    else:
+        print(f"Download failed with status code {r.status_code}")
+        print("Check if you approved 'NASA GES DISC DATA ARCHIVE' in your Earthdata account.")
+        sys.exit(1)
 
-print("Processing satellite data into map image...")
-ds = xr.open_dataset("imerg.nc4", engine="netcdf4")
+print("3. Processing satellite data into map image...")
+try:
+    # Use h5netcdf engine specifically for NASA's new HDF5 format
+    ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf")
+except Exception as e:
+    print(f"Error opening file. Details: {e}")
+    sys.exit(1)
 
-# Extract the precipitation data variable
+# Extract precipitation
 if 'precipitation' in ds:
     precip = ds['precipitation'].squeeze().values
-else:
+elif 'precipitationCal' in ds:
     precip = ds['precipitationCal'].squeeze().values
+else:
+    print(f"Error: Could not find precipitation variable. Available variables: {list(ds.keys())}")
+    sys.exit(1)
 
-# Reshape data to fit the map: Transpose to (Lat, Lon) and flip vertically
-data = np.flipud(precip.T)
+data_val = np.flipud(precip.T)
 
-# Apply the weather color map (Blue -> Cyan -> Green -> Yellow -> Red -> Magenta)
+# Paint the map
 cmap = plt.get_cmap('jet')
-data_rgba = cmap(plt.Normalize(vmin=0.1, vmax=50)(data))
+data_rgba = cmap(plt.Normalize(vmin=0.1, vmax=50)(data_val))
 
-# Mask out areas with no rain (< 0.1 mm/hr) and empty data (NaN) by making them transparent
-data_rgba[data < 0.1, 3] = 0
-data_rgba[np.isnan(data), 3] = 0
+# Make empty areas transparent
+data_rgba[data_val < 0.1, 3] = 0
+data_rgba[np.isnan(data_val), 3] = 0
 
 plt.imsave("imerg_latest.png", data_rgba)
 
-print("Saving timestamp metadata...")
+print("4. Saving timestamp metadata...")
 with open("imerg_info.json", "w") as f:
     json.dump({"time": start_time}, f)
 
