@@ -121,10 +121,10 @@
         .search-btn { width: auto; padding: 10px; justify-content: center; }
         
         /* ---------------------------------------------------
-           SCALE & MEASURE STYLES
+           SCALE, MEASURE & GRID STYLES
            --------------------------------------------------- */
         #dynamic-scale-btn {
-            cursor: default; /* Not clickable */
+            cursor: default;
             justify-content: center;
             color: #0056b3;
         }
@@ -134,6 +134,16 @@
             color: #fff; font-weight: bold; font-size: 12px;
         }
         .measure-active { background-color: #ffcccc !important; color: #990000; border-color: #990000; }
+        
+        .grid-tooltip {
+            background: rgba(255, 204, 0, 0.9);
+            border: 1px solid #990000;
+            color: #333;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 4px 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
 
         /* ---------------------------------------------------
            LEGENDS & POPUPS
@@ -269,8 +279,8 @@
         <div class="dropdown-wrapper">
             <button class="custom-btn" onclick="toggleMenu('menu-basemap')">Base Map <span>▼</span></button>
             <div id="menu-basemap" class="menu-panel narrow">
-                <label><input type="radio" name="basemap" value="night" checked> Night Mode</label>
-                <label><input type="radio" name="basemap" value="ocean"> Blue Ocean</label>
+                <label><input type="radio" name="basemap" value="night"> Night Mode</label>
+                <label><input type="radio" name="basemap" value="ocean" checked> Blue Ocean</label>
                 <label><input type="radio" name="basemap" value="satellite"> Satellite</label>
                 <div class="menu-separator"></div>
                 <div style="font-size: 11px; color:#777; margin-bottom: 5px;">OVERLAYS</div>
@@ -538,7 +548,7 @@
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}')
             ])
         };
-        basemaps.night.addTo(map);
+        basemaps.ocean.addTo(map); // Default set to ocean to match the user's screenshot context
 
         const gridLayer = L.layerGroup(); 
         const countryLayer = L.layerGroup(); 
@@ -550,8 +560,47 @@
         let countriesLoaded = false; 
         let myStatesLoaded = false;
 
-        for (let lat = -90; lat <= 90; lat += 5) L.polyline([[lat, -180], [lat, 180]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
-        for (let lon = -180; lon <= 180; lon += 5) L.polyline([[-90, lon], [90, lon]], {color: '#888', weight: 1, opacity: 0.4, interactive: false}).addTo(gridLayer);
+        // =====================================================================
+        // UPDATED GRID LOGIC (Thicker, Interactive, Tooltips)
+        // =====================================================================
+        const normalGridStyle = { color: '#444', weight: 2, opacity: 0.6, interactive: true };
+        const hoverGridStyle = { color: '#ffcc00', weight: 4, opacity: 1.0 }; // Highlight style
+
+        // Latitude lines
+        for (let lat = -90; lat <= 90; lat += 5) {
+            let label = lat === 0 ? "Equator (0°)" : lat > 0 ? `${lat}° N` : `${Math.abs(lat)}° S`;
+            let line = L.polyline([[lat, -180], [lat, 180]], normalGridStyle);
+            
+            line.bindTooltip(label, { sticky: true, className: 'grid-tooltip' });
+            
+            line.on('mouseover', function(e) {
+                this.setStyle(hoverGridStyle);
+                this.bringToFront();
+            });
+            line.on('mouseout', function(e) {
+                this.setStyle(normalGridStyle);
+            });
+            
+            line.addTo(gridLayer);
+        }
+
+        // Longitude lines
+        for (let lon = -180; lon <= 180; lon += 5) {
+            let label = lon === 0 ? "Prime Meridian (0°)" : lon === 180 || lon === -180 ? "180°" : lon > 0 ? `${lon}° E` : `${Math.abs(lon)}° W`;
+            let line = L.polyline([[-90, lon], [90, lon]], normalGridStyle);
+            
+            line.bindTooltip(label, { sticky: true, className: 'grid-tooltip' });
+            
+            line.on('mouseover', function(e) {
+                this.setStyle(hoverGridStyle);
+                this.bringToFront();
+            });
+            line.on('mouseout', function(e) {
+                this.setStyle(normalGridStyle);
+            });
+            
+            line.addTo(gridLayer);
+        }
 
         document.getElementById('toggle-grid').addEventListener('change', (e) => e.target.checked ? gridLayer.addTo(map) : map.removeLayer(gridLayer));
 
@@ -636,10 +685,8 @@
                 legendDiv.style.display = 'block';
                 document.getElementById('satellite-time').textContent = "Loading GitHub data...";
                 
-                // Add a cache-busting timestamp so the browser always loads the newest image
                 const cacheBuster = new Date().getTime();
                 
-                // Fetch the metadata file generated by your GitHub Action
                 fetch(`imerg_info.json?t=${cacheBuster}`)
                     .then(res => res.json())
                     .then(data => {
@@ -647,7 +694,6 @@
                         const dateStr = dateObj.toISOString().split('T')[0];
                         const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + ' UTC';
                         
-                        // Calculate Malaysia Time (UTC +8)
                         const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
                         const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
                         
@@ -657,15 +703,6 @@
                             map.removeLayer(satelliteLayer);
                         }
                         
-                        /* ========================================================================= 
-                           FIX IMPLEMENTED HERE: 
-                           IMERG data usually spans from 60°S to 60°N, not 90°S to 90°N. 
-                           Adjusting the bounding box down prevents vertical distortion and aligns 
-                           the rainfall data properly over the countries. 
-                           
-                           Note: For perfect 1:1 alignment with Web Mercator basemaps, the Python 
-                           script generating this PNG must reproject to EPSG:3857 first.
-                           ========================================================================= */
                         satelliteLayer = L.imageOverlay(`imerg_latest.png?t=${cacheBuster}`, [[-60, -180], [60, 180]], {
                             opacity: 0.65,
                             interactive: false,
