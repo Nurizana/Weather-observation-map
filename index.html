@@ -112,7 +112,7 @@
             border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 1px solid #ccc; 
             width: 280px; max-height: 60vh; overflow-y: auto; z-index: 1001;
         }
-        .menu-panel.narrow { width: 200px; }
+        .menu-panel.narrow { width: 220px; }
         .menu-panel label { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; cursor: pointer; }
         .menu-separator { border-top: 1px solid #ddd; margin: 10px 0; }
 
@@ -156,7 +156,7 @@
         .map-legend { 
             background: rgba(255, 255, 255, 0.95); padding: 10px 15px; border-radius: 5px; 
             border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: none; 
-            font-size: 13px; color: #333; width: 200px; 
+            font-size: 13px; color: #333; width: 220px; 
         }
 
         .radar-gradient { height: 10px; width: 100%; margin-top: 8px; border-radius: 2px; background: linear-gradient(to right, #00ffff, #0000ff, #00ff00, #ffff00, #ffaa00, #ff0000, #ff00ff); }
@@ -200,10 +200,10 @@
             .custom-btn { width: 140px; font-size: 12px; padding: 8px 12px; }
             #loc-search { width: 140px; padding: 8px; font-size: 12px;}
             .menu-panel { width: 85vw; max-width: 290px; }
-            .menu-panel.narrow { width: 200px; }
+            .menu-panel.narrow { width: 220px; }
             
             #legend-container { bottom: 70px; left: 10px; }
-            .map-legend { width: 170px; padding: 8px 10px; }
+            .map-legend { width: 180px; padding: 8px 10px; }
             
             .leaflet-control-zoom { display: none; } 
         }
@@ -258,6 +258,15 @@
             <div style="font-size: 9px; color: #777; margin-top: 2px;">Data processed from NASA Earthdata</div>
             <div class="radar-gradient"></div>
             <div class="radar-labels"><span>0.1</span><span>50+</span></div>
+        </div>
+
+        <div id="tc-legend" class="map-legend">
+            <strong style="color:#cc0000;">TC Forecast Track JTWC</strong><br>
+            <div style="font-size: 11px; margin-top: 5px; line-height: 1.5;">
+                <span style="display:inline-block; width:15px; border-bottom: 2px dashed #d62728; margin-right:5px; vertical-align: middle;"></span> Forecast Track<br>
+                <span style="display:inline-block; width:15px; height:10px; background:rgba(214, 39, 40, 0.2); border:1px solid #d62728; margin-right:5px; vertical-align: middle;"></span> Cone of Uncertainty<br>
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#d62728; margin-right:5px; margin-left: 2px; vertical-align: middle;"></span> Storm Center
+            </div>
         </div>
     </div>
 
@@ -342,6 +351,7 @@
             <div id="menu-remote-sensing" class="menu-panel narrow">
                 <label><input type="checkbox" id="toggle-radar"> Radar: Rainfall</label>
                 <label><input type="checkbox" id="toggle-satellite"> Satellite: Rainfall</label>
+                <label><input type="checkbox" id="toggle-tc-forecast"> TC Forecast Track JTWC</label>
             </div>
         </div>
     </div>
@@ -349,6 +359,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
     
     <script>
         // =====================================================================
@@ -556,6 +567,7 @@
         
         let radarLayer = null; 
         let satelliteLayer = null;
+        let tcForecastLayer = null; // NEW: KMZ Layer reference
         
         let countriesLoaded = false; 
         let myStatesLoaded = false;
@@ -623,6 +635,10 @@
                     alert("An error occurred while searching for the location.");
                 });
         }
+
+        // =====================================================================
+        // REMOTE SENSING TOGGLES
+        // =====================================================================
 
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('radar-legend');
@@ -696,6 +712,32 @@
                 }
             }
         });
+
+        // NEW: KMZ Forecast Track Handler
+        document.getElementById('toggle-tc-forecast').addEventListener('change', (e) => {
+            const legendDiv = document.getElementById('tc-legend');
+            
+            if (e.target.checked) {
+                legendDiv.style.display = 'block';
+                
+                if (!tcForecastLayer) {
+                    // Initialize the leaflet-kmz layer
+                    tcForecastLayer = L.kmzLayer().addTo(map);
+                    
+                    // Load the local .kmz file directly
+                    tcForecastLayer.load('wp0926_2026070900.kmz');
+                } else {
+                    // Just add it back if it's already instantiated
+                    map.addLayer(tcForecastLayer);
+                }
+            } else {
+                legendDiv.style.display = 'none';
+                if (tcForecastLayer) {
+                    map.removeLayer(tcForecastLayer);
+                }
+            }
+        });
+
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
         
