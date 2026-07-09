@@ -351,9 +351,20 @@
             <div id="menu-remote-sensing" class="menu-panel narrow">
                 <label><input type="checkbox" id="toggle-radar"> Radar: Rainfall</label>
                 <label><input type="checkbox" id="toggle-satellite"> Satellite: Rainfall</label>
-                <label><input type="checkbox" id="toggle-tc-forecast"> TC Forecast Track JTWC</label>
             </div>
         </div>
+
+        <div class="dropdown-wrapper">
+            <button class="custom-btn" onclick="toggleMenu('menu-tc')">TC Forecast JTWC <span>▼</span></button>
+            <div id="menu-tc" class="menu-panel narrow">
+                <label><input type="checkbox" id="toggle-tc-all"> <b>Enable TC Data</b></label>
+                <div class="menu-separator"></div>
+                <label><input type="checkbox" class="tc-sub-toggle" id="toggle-tc-track" disabled> Forecast Track</label>
+                <label><input type="checkbox" class="tc-sub-toggle" id="toggle-tc-cone" disabled> Cone of Uncertainty</label>
+                <label><input type="checkbox" class="tc-sub-toggle" id="toggle-tc-center" disabled> Storm Center</label>
+            </div>
+        </div>
+
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -567,7 +578,6 @@
         
         let radarLayer = null; 
         let satelliteLayer = null;
-        let tcForecastLayer = null; // NEW: KMZ Layer reference
         
         let countriesLoaded = false; 
         let myStatesLoaded = false;
@@ -713,31 +723,89 @@
             }
         });
 
-        // NEW: KMZ Forecast Track Handler
-        document.getElementById('toggle-tc-forecast').addEventListener('change', (e) => {
+        // =====================================================================
+        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER
+        // =====================================================================
+        const tcTrackLayer = L.featureGroup();
+        const tcConeLayer = L.featureGroup();
+        const tcCenterLayer = L.featureGroup();
+        let tcKmzLoaded = false;
+
+        document.getElementById('toggle-tc-all').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('tc-legend');
-            
+            const subToggles = document.querySelectorAll('.tc-sub-toggle');
+
             if (e.target.checked) {
                 legendDiv.style.display = 'block';
                 
-                if (!tcForecastLayer) {
-                    // Initialize the leaflet-kmz layer
-                    tcForecastLayer = L.kmzLayer().addTo(map);
+                // Enable and check all sub-options
+                subToggles.forEach(cb => { 
+                    cb.disabled = false; 
+                    cb.checked = true; 
+                });
+
+                if (!tcKmzLoaded) {
+                    const kmzParser = L.kmzLayer();
                     
-                    // Load the local .kmz file directly
-                    tcForecastLayer.load('wp0926_2026070900.kmz');
+                    kmzParser.on('load', function(evt) {
+                        const parsedLayer = evt.layer;
+                        
+                        // Parse through the KMZ and split elements by geometry type
+                        parsedLayer.eachLayer(layer => {
+                            if (layer instanceof L.Polygon) {
+                                // Polygons usually represent the Cone of Uncertainty or Wind Radii
+                                tcConeLayer.addLayer(layer);
+                            } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                                // Lines represent the Forecast Track
+                                tcTrackLayer.addLayer(layer);
+                            } else if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+                                // Markers represent the Storm Centers
+                                tcCenterLayer.addLayer(layer);
+                            }
+                        });
+                        
+                        // Add all to map initially
+                        map.addLayer(tcTrackLayer);
+                        map.addLayer(tcConeLayer);
+                        map.addLayer(tcCenterLayer);
+                    });
+                    
+                    kmzParser.load('wp0926_2026070900.kmz');
+                    tcKmzLoaded = true;
                 } else {
-                    // Just add it back if it's already instantiated
-                    map.addLayer(tcForecastLayer);
+                    // If already loaded, just add the groups back to the map
+                    map.addLayer(tcTrackLayer);
+                    map.addLayer(tcConeLayer);
+                    map.addLayer(tcCenterLayer);
                 }
             } else {
                 legendDiv.style.display = 'none';
-                if (tcForecastLayer) {
-                    map.removeLayer(tcForecastLayer);
-                }
+                
+                // Disable and uncheck all sub-options
+                subToggles.forEach(cb => { 
+                    cb.disabled = true; 
+                    cb.checked = false; 
+                });
+                
+                // Remove all layers from map
+                map.removeLayer(tcTrackLayer);
+                map.removeLayer(tcConeLayer);
+                map.removeLayer(tcCenterLayer);
             }
         });
 
+        // Individual Component Toggles
+        document.getElementById('toggle-tc-track').addEventListener('change', (e) => {
+            e.target.checked ? map.addLayer(tcTrackLayer) : map.removeLayer(tcTrackLayer);
+        });
+
+        document.getElementById('toggle-tc-cone').addEventListener('change', (e) => {
+            e.target.checked ? map.addLayer(tcConeLayer) : map.removeLayer(tcConeLayer);
+        });
+
+        document.getElementById('toggle-tc-center').addEventListener('change', (e) => {
+            e.target.checked ? map.addLayer(tcCenterLayer) : map.removeLayer(tcCenterLayer);
+        });
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
         
@@ -884,7 +952,7 @@
         });
 
         function toggleMenu(menuId) {
-            ['menu-basemap', 'menu-remote-sensing', 'menu-country', 'menu-params'].forEach(id => {
+            ['menu-basemap', 'menu-remote-sensing', 'menu-country', 'menu-params', 'menu-tc'].forEach(id => {
                 const el = document.getElementById(id);
                 el.style.display = (id === menuId && el.style.display !== 'flex') ? 'flex' : 'none';
             });
