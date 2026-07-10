@@ -76,6 +76,28 @@
         #auth-message { margin-top: 30px; color: white; font-size: 15px; text-align: center; min-height: 30px; line-height: 1.4; max-width: 600px; }
 
         /* ---------------------------------------------------
+           TIMEOUT WARNING OVERLAY
+           --------------------------------------------------- */
+        #timeout-warning {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.85); z-index: 10000;
+            display: none; justify-content: center; align-items: center;
+        }
+        .timeout-box {
+            background: white; padding: 25px 35px; border-radius: 8px;
+            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 400px; border: 2px solid #ff4c4c;
+        }
+        .timeout-box h3 { margin-top: 0; color: #ff4c4c; font-size: 20px; }
+        .timeout-box p { font-size: 16px; margin: 15px 0 25px 0; color: #333; }
+        .timeout-box span { font-weight: bold; font-size: 24px; color: #d62728; }
+        .timeout-box button {
+            background: #0056b3; color: white; border: none; padding: 10px 20px;
+            border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;
+        }
+        .timeout-box button:hover { background: #004494; }
+
+        /* ---------------------------------------------------
            TOP LEFT USER PROFILE
            --------------------------------------------------- */
         #user-profile {
@@ -210,6 +232,14 @@
     </style>
 </head>
 <body class="security-lock no-print">
+
+    <div id="timeout-warning">
+        <div class="timeout-box">
+            <h3>⚠️ Session Expiring</h3>
+            <p>You have been inactive. You will be logged out in <br><span id="timeout-countdown">15</span> seconds.</p>
+            <button onclick="resetActivityTimer()">Keep Me Logged In</button>
+        </div>
+    </div>
 
     <div id="auth-overlay">
         <div class="auth-container">
@@ -391,6 +421,59 @@
         const msgBox = document.getElementById('auth-message');
         const adminEmail = "nuriaziz2021@gmail.com";
 
+        // =====================================================================
+        // SESSION TIMEOUT LOGIC
+        // =====================================================================
+        let inactivityTimer;
+        let countdownInterval;
+        const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes in milliseconds
+        const COUNTDOWN_LIMIT = 15; // 15 seconds
+
+        function startSessionMonitor() {
+            // Stop any existing monitors first to prevent duplicates
+            stopSessionMonitor();
+            
+            // Add listeners for various user activities to reset the timer
+            ['mousemove', 'mousedown', 'keypress', 'touchstart', 'scroll'].forEach(evt => {
+                document.addEventListener(evt, resetActivityTimer, { passive: true });
+            });
+            resetActivityTimer(); // Start the timer immediately upon login
+        }
+
+        function stopSessionMonitor() {
+            clearTimeout(inactivityTimer);
+            clearInterval(countdownInterval);
+            ['mousemove', 'mousedown', 'keypress', 'touchstart', 'scroll'].forEach(evt => {
+                document.removeEventListener(evt, resetActivityTimer);
+            });
+            document.getElementById('timeout-warning').style.display = 'none';
+        }
+
+        function resetActivityTimer() {
+            clearTimeout(inactivityTimer);
+            clearInterval(countdownInterval);
+            document.getElementById('timeout-warning').style.display = 'none';
+            inactivityTimer = setTimeout(showTimeoutWarning, INACTIVITY_LIMIT);
+        }
+
+        function showTimeoutWarning() {
+            let timeLeft = COUNTDOWN_LIMIT;
+            document.getElementById('timeout-countdown').innerText = timeLeft;
+            document.getElementById('timeout-warning').style.display = 'flex';
+
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timeout-countdown').innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    logoutUser(); // Log the user out when time runs out
+                }
+            }, 1000);
+        }
+
+        // =====================================================================
+        // AUTHENTICATION LOGIC
+        // =====================================================================
         auth.onAuthStateChanged(user => {
             if (user) {
                 if (!user.emailVerified && user.email !== adminEmail) {
@@ -422,11 +505,17 @@
                     document.addEventListener('keyup', screenshotBlocker);
                 }
                 
+                // Start tracking user inactivity now that they are successfully logged in
+                startSessionMonitor();
+
                 setTimeout(() => { map.invalidateSize(); }, 100);
             } else {
                 document.getElementById('auth-overlay').style.display = 'flex';
                 document.getElementById('user-profile').style.display = 'none';
                 document.body.classList.add('security-lock', 'no-print');
+                
+                // Stop tracking inactivity when logged out
+                stopSessionMonitor();
             }
         });
 
@@ -458,7 +547,7 @@
             auth.signOut().then(() => {
                 document.getElementById('log-email').value = "";
                 document.getElementById('log-pass').value = "";
-                msgBox.textContent = "You have been logged out.";
+                msgBox.textContent = "You have been logged out due to session expiration or user action.";
             });
         }
 
@@ -469,6 +558,9 @@
             }
         }
 
+        // =====================================================================
+        // MAP INITIALIZATION & TOOLS
+        // =====================================================================
         const map = L.map('map', { zoomControl: false }).setView([15.0, 105.0], 4);
         
         if(window.innerWidth > 768) { L.control.zoom({ position: 'topleft' }).addTo(map); }
