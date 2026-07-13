@@ -184,6 +184,12 @@
         .radar-gradient { height: 10px; width: 100%; margin-top: 8px; border-radius: 2px; background: linear-gradient(to right, #00ffff, #0000ff, #00ff00, #ffff00, #ffaa00, #ff0000, #ff00ff); }
         .radar-labels { display: flex; justify-content: space-between; font-size: 10px; margin-top: 3px; font-weight: bold; color: #555; }
         
+        /* Animation Player Controls */
+        .player-controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; border-top: 1px solid #ddd; padding-top: 8px; }
+        .play-btn { background: #0056b3; color: white; border: none; border-radius: 4px; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 12px; }
+        .play-btn:hover { background: #004494; }
+        .player-slider { flex: 1; cursor: pointer; }
+        
         .time-control-container { display: flex; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px; gap: 10px; }
         .date-section { flex: 1; min-width: 90px; }
         .hour-section { flex: 1.5; border: 1px solid #ccc; border-radius: 4px; padding: 5px; max-height: 120px; overflow-y: auto; background: #f9f9f9; }
@@ -286,7 +292,13 @@
             <strong style="color:#0056b3;">Satellite: Rainfall (mm/hr)</strong><br>
             <div id="satellite-time" style="font-size: 12px; font-weight: bold; margin-top: 4px; color: #444;">Loading time...</div>
             <div style="font-size: 9px; color: #777; margin-top: 2px;">Data processed from NASA Earthdata</div>
-            <div class="radar-gradient"></div>
+            
+            <div id="sat-player-container" class="player-controls" style="display: none;">
+                <button id="sat-play-btn" class="play-btn" onclick="toggleSatAnimation()">▶</button>
+                <input type="range" id="sat-slider" class="player-slider" min="0" max="9" value="9" step="1">
+            </div>
+
+            <div class="radar-gradient" style="margin-top: 10px;"></div>
             <div class="radar-labels"><span>0.1</span><span>50+</span></div>
         </div>
 
@@ -430,14 +442,12 @@
         const COUNTDOWN_LIMIT = 15; // 15 seconds
 
         function startSessionMonitor() {
-            // Stop any existing monitors first to prevent duplicates
             stopSessionMonitor();
             
-            // Add listeners for various user activities to reset the timer
             ['mousemove', 'mousedown', 'keypress', 'touchstart', 'scroll'].forEach(evt => {
                 document.addEventListener(evt, resetActivityTimer, { passive: true });
             });
-            resetActivityTimer(); // Start the timer immediately upon login
+            resetActivityTimer(); 
         }
 
         function stopSessionMonitor() {
@@ -466,7 +476,7 @@
                 document.getElementById('timeout-countdown').innerText = timeLeft;
                 if (timeLeft <= 0) {
                     clearInterval(countdownInterval);
-                    logoutUser(); // Log the user out when time runs out
+                    logoutUser(); 
                 }
             }, 1000);
         }
@@ -505,16 +515,12 @@
                     document.addEventListener('keyup', screenshotBlocker);
                 }
                 
-                // Start tracking user inactivity now that they are successfully logged in
                 startSessionMonitor();
-
                 setTimeout(() => { map.invalidateSize(); }, 100);
             } else {
                 document.getElementById('auth-overlay').style.display = 'flex';
                 document.getElementById('user-profile').style.display = 'none';
                 document.body.classList.add('security-lock', 'no-print');
-                
-                // Stop tracking inactivity when logged out
                 stopSessionMonitor();
             }
         });
@@ -669,7 +675,6 @@
         const myStateLayer = L.layerGroup();
         
         let radarLayer = null; 
-        let satelliteLayer = null;
         
         let countriesLoaded = false; 
         let myStatesLoaded = false;
@@ -739,9 +744,8 @@
         }
 
         // =====================================================================
-        // REMOTE SENSING TOGGLES
+        // REMOTE SENSING TOGGLES (RADAR)
         // =====================================================================
-
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('radar-legend');
             if (e.target.checked) {
@@ -773,45 +777,120 @@
             }
         });
 
+        // =====================================================================
+        // NEW SATELLITE ANIMATION LOGIC
+        // =====================================================================
+        let satFramesData = [];
+        let satLayers = [];
+        let currentSatFrameIdx = 0;
+        let satPlayInterval = null;
+        let isSatPlaying = false;
+
+        function updateSatelliteUI(idx) {
+            if (satFramesData.length === 0) return;
+            
+            // Manage Layers: Only show the active frame to save memory
+            satLayers.forEach((layer, i) => {
+                if (i === idx) {
+                    if (!map.hasLayer(layer)) layer.addTo(map);
+                } else {
+                    if (map.hasLayer(layer)) map.removeLayer(layer);
+                }
+            });
+
+            // Update Time display
+            const frame = satFramesData[idx];
+            const dateObj = new Date(frame.time);
+            const dateStr = dateObj.toISOString().split('T')[0];
+            const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + ' UTC';
+            const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
+            const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
+            
+            document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
+            document.getElementById('sat-slider').value = idx;
+        }
+
+        function toggleSatAnimation() {
+            const btn = document.getElementById('sat-play-btn');
+            if (isSatPlaying) {
+                clearInterval(satPlayInterval);
+                btn.textContent = "▶";
+                isSatPlaying = false;
+            } else {
+                btn.textContent = "⏸";
+                isSatPlaying = true;
+                
+                // If at the end, restart from beginning
+                if (currentSatFrameIdx >= satFramesData.length - 1) {
+                    currentSatFrameIdx = 0;
+                }
+                
+                updateSatelliteUI(currentSatFrameIdx);
+                
+                satPlayInterval = setInterval(() => {
+                    currentSatFrameIdx++;
+                    if (currentSatFrameIdx >= satFramesData.length) {
+                        currentSatFrameIdx = 0; // loop back
+                    }
+                    updateSatelliteUI(currentSatFrameIdx);
+                }, 1000); // Change frame every 1 second
+            }
+        }
+
+        // Slider manual control
+        document.getElementById('sat-slider').addEventListener('input', (e) => {
+            if (isSatPlaying) toggleSatAnimation(); // Pause animation if user drags slider
+            currentSatFrameIdx = parseInt(e.target.value, 10);
+            updateSatelliteUI(currentSatFrameIdx);
+        });
+
         document.getElementById('toggle-satellite').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('satellite-legend');
+            const playerContainer = document.getElementById('sat-player-container');
+            
             if (e.target.checked) {
                 legendDiv.style.display = 'block';
                 document.getElementById('satellite-time').textContent = "Loading GitHub data...";
-                
                 const cacheBuster = new Date().getTime();
                 
                 fetch(`imerg_info.json?t=${cacheBuster}`)
                     .then(res => res.json())
                     .then(data => {
-                        const dateObj = new Date(data.time);
-                        const dateStr = dateObj.toISOString().split('T')[0];
-                        const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + ' UTC';
+                        let frames = Array.isArray(data) ? data : [data];
+                        if (frames.length > 10) frames = frames.slice(-10); // Enforce max 10
                         
-                        const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
-                        const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
-                        
-                        document.getElementById('satellite-time').innerHTML = `${dateStr} <br> ${utcStr} <br> ${mytStr}`;
-                        
-                        if (satelliteLayer) {
-                            map.removeLayer(satelliteLayer);
-                        }
-                        
-                        satelliteLayer = L.imageOverlay(`imerg_latest.png?t=${cacheBuster}`, [[-60, -180], [60, 180]], {
-                            opacity: 0.65,
-                            interactive: false,
-                            zIndex: 9 
-                        }).addTo(map);
+                        satFramesData = frames;
+                        currentSatFrameIdx = frames.length - 1; // Default to latest
+
+                        // Setup UI Slider
+                        const slider = document.getElementById('sat-slider');
+                        slider.max = frames.length - 1;
+                        slider.value = currentSatFrameIdx;
+                        playerContainer.style.display = frames.length > 1 ? 'flex' : 'none';
+
+                        // Create image overlays but don't add to map yet
+                        satLayers.forEach(l => map.removeLayer(l));
+                        satLayers = frames.map(frame => {
+                            const imgPath = frame.image ? `${frame.image}?t=${cacheBuster}` : `imerg_latest.png?t=${cacheBuster}`;
+                            return L.imageOverlay(imgPath, [[-60, -180], [60, 180]], {
+                                opacity: 0.65,
+                                interactive: false,
+                                zIndex: 9 
+                            });
+                        });
+
+                        updateSatelliteUI(currentSatFrameIdx);
                     })
                     .catch(err => {
                         console.error("Failed to load GitHub IMERG data:", err);
-                        document.getElementById('satellite-time').innerHTML = `<span style="color:red">Run the GitHub Action to generate data.</span>`;
+                        document.getElementById('satellite-time').innerHTML = `<span style="color:red">Failed to load data.</span>`;
                     });
             } else {
+                // Cleanup on hide
                 legendDiv.style.display = 'none';
-                if (satelliteLayer) {
-                    map.removeLayer(satelliteLayer);
-                }
+                if (isSatPlaying) toggleSatAnimation();
+                satLayers.forEach(l => map.removeLayer(l));
+                satLayers = [];
             }
         });
 
