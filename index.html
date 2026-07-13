@@ -816,70 +816,121 @@
         });
 
         // =====================================================================
-        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER
+        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER (AUTO-MONITOR)
         // =====================================================================
         const tcTrackLayer = L.featureGroup();
         const tcConeLayer = L.featureGroup();
         const tcCenterLayer = L.featureGroup();
         let tcKmzLoaded = false;
+        
+        // Stored HTML templates for the legend
+        const originalLegendHTML = `
+            <strong style="color:#cc0000;">TC Forecast Track JTWC</strong><br>
+            <div style="font-size: 11px; margin-top: 5px; line-height: 1.5;">
+                <span style="display:inline-block; width:15px; border-bottom: 2px dashed #d62728; margin-right:5px; vertical-align: middle;"></span> Forecast Track<br>
+                <span style="display:inline-block; width:15px; height:10px; background:rgba(214, 39, 40, 0.2); border:1px solid #d62728; margin-right:5px; vertical-align: middle;"></span> Cone of Uncertainty<br>
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#d62728; margin-right:5px; margin-left: 2px; vertical-align: middle;"></span> Storm Center
+            </div>
+        `;
 
-        document.getElementById('toggle-tc-all').addEventListener('change', (e) => {
+        const inactiveLegendHTML = `
+            <strong style="color:#0056b3;">TC Forecast Status</strong><br>
+            <div style="font-size: 12px; margin-top: 5px; color: #444; line-height: 1.4;">
+                Currently, there are no active tropical cyclones in this region.
+            </div>
+        `;
+
+        document.getElementById('toggle-tc-all').addEventListener('change', async (e) => {
             const legendDiv = document.getElementById('tc-legend');
             const subToggles = document.querySelectorAll('.tc-sub-toggle');
 
             if (e.target.checked) {
+                // Show a loading message while we check the server
                 legendDiv.style.display = 'block';
+                legendDiv.innerHTML = `<strong style="color:#0056b3;">Checking TC Status...</strong>`;
                 
-                // Enable and check all sub-options
-                subToggles.forEach(cb => { 
-                    cb.disabled = false; 
-                    cb.checked = true; 
-                });
+                let isTCActive = false;
+
+                try {
+                    // 1. Fetch file info (A HEAD request reads the timestamp without downloading the file)
+                    const cacheBuster = new Date().getTime();
+                    const response = await fetch(`tc_data/latest_tc.kmz?t=${cacheBuster}`, { method: 'HEAD' });
+                    
+                    if (!response.ok) throw new Error('File not found on server');
+
+                    // 2. Check the time it was last modified on GitHub
+                    const lastModifiedHeader = response.headers.get('Last-Modified');
+                    if (!lastModifiedHeader) throw new Error('Could not read modification date');
+                    
+                    const lastModified = new Date(lastModifiedHeader);
+                    const now = new Date();
+                    const hoursOld = (now - lastModified) / (1000 * 60 * 60);
+
+                    // 3. Set active only if the file was updated within the last 24 hours
+                    if (hoursOld <= 24) {
+                        isTCActive = true;
+                    }
+                } catch (err) {
+                    console.warn("TC Data Check:", err.message);
+                    isTCActive = false;
+                }
+
+                // --- EXECUTE UI BASED ON STATUS ---
+                if (!isTCActive) {
+                    // Trigger the notification
+                    alert("No Active TC In The Region.");
+                    
+                    // Show inactive legend, disable sub-options, and uncheck the main box
+                    legendDiv.innerHTML = inactiveLegendHTML;
+                    e.target.checked = false; 
+                    subToggles.forEach(cb => { cb.disabled = true; cb.checked = false; });
+                    
+                    // Hide the legend box entirely after 3 seconds
+                    setTimeout(() => { 
+                        if(!document.getElementById('toggle-tc-all').checked) {
+                            legendDiv.style.display = 'none'; 
+                        }
+                    }, 3000);
+                    return;
+                }
+
+                // STORM IS ACTIVE: Load and display data
+                legendDiv.innerHTML = originalLegendHTML;
+                subToggles.forEach(cb => { cb.disabled = false; cb.checked = true; });
 
                 if (!tcKmzLoaded) {
                     const kmzParser = L.kmzLayer();
                     
                     kmzParser.on('load', function(evt) {
                         const parsedLayer = evt.layer;
-                        
-                        // Parse through the KMZ and split elements by geometry type
                         parsedLayer.eachLayer(layer => {
                             if (layer instanceof L.Polygon) {
-                                // Polygons usually represent the Cone of Uncertainty or Wind Radii
                                 tcConeLayer.addLayer(layer);
                             } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-                                // Lines represent the Forecast Track
                                 tcTrackLayer.addLayer(layer);
                             } else if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
-                                // Markers represent the Storm Centers
                                 tcCenterLayer.addLayer(layer);
                             }
                         });
                         
-                        // Add all to map initially
                         map.addLayer(tcTrackLayer);
                         map.addLayer(tcConeLayer);
                         map.addLayer(tcCenterLayer);
                     });
                     
-                    kmzParser.load('wp0926_2026071003.kmz');
+                    // Load the verified active file
+                    kmzParser.load(`tc_data/latest_tc.kmz?t=${new Date().getTime()}`);
                     tcKmzLoaded = true;
                 } else {
-                    // If already loaded, just add the groups back to the map
                     map.addLayer(tcTrackLayer);
                     map.addLayer(tcConeLayer);
                     map.addLayer(tcCenterLayer);
                 }
+
             } else {
+                // WHEN CHECKBOX IS UNCHECKED MANUALLY
                 legendDiv.style.display = 'none';
-                
-                // Disable and uncheck all sub-options
-                subToggles.forEach(cb => { 
-                    cb.disabled = true; 
-                    cb.checked = false; 
-                });
-                
-                // Remove all layers from map
+                subToggles.forEach(cb => { cb.disabled = true; cb.checked = false; });
                 map.removeLayer(tcTrackLayer);
                 map.removeLayer(tcConeLayer);
                 map.removeLayer(tcCenterLayer);
