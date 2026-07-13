@@ -17,8 +17,9 @@ urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 user = os.environ.get('EARTHDATA_USER')
 password = os.environ.get('EARTHDATA_PASS')
 
-print("1. Querying NASA CMR for the latest IMERG Early Run data...")
-cmr_url = "https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=1&sort_key=-start_date"
+print("1. Querying NASA CMR for the 10 latest IMERG Early Run data...")
+# CHANGED: Requesting 10 granules instead of 1
+cmr_url = "https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=10&sort_key=-start_date"
 response = requests.get(cmr_url)
 
 if not response.ok:
@@ -26,76 +27,100 @@ if not response.ok:
     sys.exit(1)
 
 data = response.json()
-granule = data['feed']['entry'][0]
+entries = data['feed']['entry']
 
-# Extract the download link
-links = granule['links']
-download_url = None
-for link in links:
-    href = link.get('href', '')
-    if href.endswith('.HDF5') or href.endswith('.nc4') or href.endswith('.h5'):
-        download_url = href
-        break
-
-if not download_url:
-    print("Error: Could not find a valid data download link.")
-    print("Available links:", [l.get('href') for l in links])
+if not entries:
+    print("Error: No data granules found.")
     sys.exit(1)
 
-start_time = granule['time_start']
+# Reverse the entries so the oldest is first (index 0) and newest is last (index 9)
+# This ensures the animation plays chronologically forward in time.
+entries.reverse()
 
-print(f"2. Downloading: {download_url}")
+frames_data = []
 
-# NASA uses a redirect system for logins.
+# Use a single session to handle all 10 downloads without re-authenticating each time
 with requests.Session() as s:
     s.auth = (user, password)
-    r1 = s.request('get', download_url)
-    r = s.get(r1.url, auth=(user, password))
     
-    if r.ok:
-        with open("imerg_data.hdf5", "wb") as f:
-            f.write(r.content)
-        print("Download successful!")
-    else:
-        print(f"Download failed with status code {r.status_code}")
-        print("Check if you approved 'NASA GES DISC DATA ARCHIVE' in your Earthdata account.")
-        sys.exit(1)
+    for i, granule in enumerate(entries):
+        start_time = granule['time_start']
+        
+        # Extract the download link
+        links = granule['links']
+        download_url = None
+        for link in links:
+            href = link.get('href', '')
+            if href.endswith('.HDF5') or href.endswith('.nc4') or href.endswith('.h5'):
+                download_url = href
+                break
 
-print("3. Processing satellite data into map image...")
-try:
-    # FIX: NASA V07 hides the data inside a group called 'Grid'
-    ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf", group="Grid")
-except Exception:
-    # Fallback to root just in case they revert it
-    try:
-        ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf")
-    except Exception as e:
-        print(f"Error opening file. Details: {e}")
-        sys.exit(1)
+        if not download_url:
+            print(f"Warning: Could not find a valid data download link for granule {i}. Skipping.")
+            continue
 
-# Extract precipitation
-if 'precipitation' in ds:
-    precip = ds['precipitation'].squeeze().values
-elif 'precipitationCal' in ds:
-    precip = ds['precipitationCal'].squeeze().values
-else:
-    print(f"Error: Could not find precipitation variable. Available variables: {list(ds.keys())}")
-    sys.exit(1)
+        print(f"\n--- Processing Frame {i+1}/10 ---")
+        print(f"Time: {start_time}")
+        print(f"Downloading: {download_url}")
 
-data_val = np.flipud(precip.T)
+        r1 = s.request('get', download_url)
+        r = s.get(r1.url, auth=(user, password))
+        
+        if r.ok:
+            with open("imerg_data.hdf5", "wb") as f:
+                f.write(r.content)
+            print("Download successful. Processing image...")
+        else:
+            print(f"Download failed with status code {r.status_code}. Skipping.")
+            continue
 
-# Paint the map
-cmap = plt.get_cmap('jet')
-data_rgba = cmap(plt.Normalize(vmin=0.1, vmax=50)(data_val))
+        try:
+            # FIX: NASA V07 hides the data inside a group called 'Grid'
+            ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf", group="Grid")
+        except Exception:
+            # Fallback to root just in case they revert it
+            try:
+                ds = xr.open_dataset("imerg_data.hdf5", engine="h5netcdf")
+            except Exception as e:
+                print(f"Error opening file. Details: {e}. Skipping.")
+                continue
 
-# Make empty areas transparent
-data_rgba[data_val < 0.1, 3] = 0
-data_rgba[np.isnan(data_val), 3] = 0
+        # Extract precipitation
+        if 'precipitation' in ds:
+            precip = ds['precipitation'].squeeze().values
+        elif 'precipitationCal' in ds:
+            precip = ds['precipitationCal'].squeeze().values
+        else:
+            print(f"Warning: Could not find precipitation variable. Skipping.")
+            ds.close()
+            continue
 
-plt.imsave("imerg_latest.png", data_rgba)
+        data_val = np.flipud(precip.T)
 
-print("4. Saving timestamp metadata...")
+        # Paint the map
+        cmap = plt.get_cmap('jet')
+        data_rgba = cmap(plt.Normalize(vmin=0.1, vmax=50)(data_val))
+
+        # Make empty areas transparent
+        data_rgba[data_val < 0.1, 3] = 0
+        data_rgba[np.isnan(data_val), 3] = 0
+        
+        ds.close() # Free up resources for the next iteration
+
+        # Save indexed image
+        image_filename = f"imerg_{i}.png"
+        plt.imsave(image_filename, data_rgba)
+        print(f"Saved {image_filename}")
+
+        # Append to metadata array
+        frames_data.append({
+            "time": start_time,
+            "image": image_filename
+        })
+
+print("\n4. Saving timestamp metadata...")
 with open("imerg_info.json", "w") as f:
-    json.dump({"time": start_time}, f)
+    # Save the array as JSON
+    json.dump(frames_data, f, indent=4)
 
 print("Update complete!")
