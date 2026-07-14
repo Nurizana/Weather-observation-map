@@ -4,9 +4,13 @@ import json
 import requests
 import xarray as xr
 import numpy as np
+import time  # Added for delay between downloads
 import matplotlib
 matplotlib.use('Agg') # Prevents display errors in headless servers
 import matplotlib.pyplot as plt
+
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # --- FIX FOR GITHUB ACTIONS IPv6 BUG WITH NASA ---
 import socket
@@ -18,7 +22,7 @@ user = os.environ.get('EARTHDATA_USER')
 password = os.environ.get('EARTHDATA_PASS')
 
 print("1. Querying NASA CMR for the 10 latest IMERG Early Run data...")
-# CHANGED: Requesting 10 granules instead of 1
+# Requesting 10 granules instead of 1
 cmr_url = "https://cmr.earthdata.nasa.gov/search/granules.json?short_name=GPM_3IMERGHHE&page_size=10&sort_key=-start_date"
 response = requests.get(cmr_url)
 
@@ -39,9 +43,21 @@ entries.reverse()
 
 frames_data = []
 
-# Use a single session to handle all 10 downloads without re-authenticating each time
+# --- SETUP RETRY STRATEGY & SESSION ---
+# This will retry up to 5 times for common server-side errors/timeouts, 
+# increasing the delay between retries automatically.
+retry_strategy = Retry(
+    total=5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS"],
+    backoff_factor=1
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+
 with requests.Session() as s:
     s.auth = (user, password)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
     
     for i, granule in enumerate(entries):
         start_time = granule['time_start']
@@ -63,15 +79,21 @@ with requests.Session() as s:
         print(f"Time: {start_time}")
         print(f"Downloading: {download_url}")
 
-        r1 = s.request('get', download_url)
-        r = s.get(r1.url, auth=(user, password))
-        
-        if r.ok:
-            with open("imerg_data.hdf5", "wb") as f:
-                f.write(r.content)
-            print("Download successful. Processing image...")
-        else:
-            print(f"Download failed with status code {r.status_code}. Skipping.")
+        try:
+            # ADDED: 30-second timeout to prevent infinite hanging connections
+            r1 = s.request('get', download_url, timeout=30)
+            r = s.get(r1.url, auth=(user, password), timeout=30)
+            
+            if r.ok:
+                with open("imerg_data.hdf5", "wb") as f:
+                    f.write(r.content)
+                print("Download successful. Processing image...")
+            else:
+                print(f"Download failed with status code {r.status_code}. Skipping.")
+                continue
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Network error during download: {e}. Skipping.")
             continue
 
         try:
@@ -117,6 +139,9 @@ with requests.Session() as s:
             "time": start_time,
             "image": image_filename
         })
+        
+        # ADDED: 2-second sleep to avoid hitting NASA's rate limits/connection blocks
+        time.sleep(2)
 
 print("\n4. Saving timestamp metadata...")
 with open("imerg_info.json", "w") as f:
