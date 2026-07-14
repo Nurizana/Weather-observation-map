@@ -20,10 +20,18 @@ jobs:
           python-version: '3.10'
 
       - name: Install Python GIS Libraries
-        run: pip install requests xarray netCDF4 h5netcdf h5py matplotlib numpy
+        # Added urllib3 explicitly to ensure the retry mechanisms we added work perfectly
+        run: pip install requests urllib3 xarray netCDF4 h5netcdf h5py matplotlib numpy
+
+      - name: Set up Earthdata Credentials (.netrc)
+        # Creating a .netrc file ensures NASA's cross-domain redirects don't drop your authentication
+        run: |
+          echo "machine urs.earthdata.nasa.gov login ${{ secrets.EARTHDATA_USER }} password ${{ secrets.EARTHDATA_PASS }}" > ~/.netrc
+          chmod 0600 ~/.netrc
 
       - name: Run NASA Download & Processing Script
         env:
+          # Keep these in case your python script specifically calls them via os.environ
           EARTHDATA_USER: ${{ secrets.EARTHDATA_USER }}
           EARTHDATA_PASS: ${{ secrets.EARTHDATA_PASS }}
         run: python update_imerg.py
