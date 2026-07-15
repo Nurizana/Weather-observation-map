@@ -895,7 +895,7 @@
         });
 
         // =====================================================================
-        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER (AUTO-MONITOR)
+        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER (GITHUB API MONITORING)
         // =====================================================================
         const tcTrackLayer = L.featureGroup();
         const tcConeLayer = L.featureGroup();
@@ -931,23 +931,30 @@
                 let isTCActive = false;
 
                 try {
-                    // 1. Fetch file info (A HEAD request reads the timestamp without downloading the file)
-                    const cacheBuster = new Date().getTime();
-                    const response = await fetch(`tc_data/latest_tc.kmz?t=${cacheBuster}`, { method: 'HEAD' });
+                    // NEW METHOD: Use GitHub API to bypass CDN caching of HTTP headers.
+                    // This accurately checks the last commit time for this specific file.
+                    const owner = 'Nurizana'; // Make sure this matches your GitHub username
+                    const repo = 'Weather-observation-map'; // Make sure this matches your repo name
+                    const path = 'tc_data/latest_tc.kmz';
                     
-                    if (!response.ok) throw new Error('File not found on server');
-
-                    // 2. Check the time it was last modified on GitHub
-                    const lastModifiedHeader = response.headers.get('Last-Modified');
-                    if (!lastModifiedHeader) throw new Error('Could not read modification date');
+                    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?path=${path}&page=1&per_page=1`;
+                    const response = await fetch(apiUrl);
                     
-                    const lastModified = new Date(lastModifiedHeader);
-                    const now = new Date();
-                    const hoursOld = (now - lastModified) / (1000 * 60 * 60);
+                    if (!response.ok) throw new Error('Could not fetch commit history from GitHub API');
+                    const commitData = await response.json();
+                    
+                    if (commitData && commitData.length > 0) {
+                        const lastModifiedDateStr = commitData[0].commit.committer.date;
+                        const lastModified = new Date(lastModifiedDateStr);
+                        const now = new Date();
+                        const hoursOld = (now - lastModified) / (1000 * 60 * 60);
 
-                    // 3. Set active only if the file was updated within the last 24 hours
-                    if (hoursOld <= 24) {
-                        isTCActive = true;
+                        // Set active only if the file was updated within the last 24 hours
+                        if (hoursOld <= 24) {
+                            isTCActive = true;
+                        }
+                    } else {
+                        throw new Error('No commits found for the specified file.');
                     }
                 } catch (err) {
                     console.warn("TC Data Check:", err.message);
