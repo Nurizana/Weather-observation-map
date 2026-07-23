@@ -284,7 +284,13 @@
         <div id="radar-legend" class="map-legend">
             <strong style="color:#0056b3;">Radar: Rainfall (mm/hr)</strong><br>
             <div id="radar-time" style="font-size: 12px; font-weight: bold; margin-top: 4px; color: #444;">Loading time...</div>
-            <div class="radar-gradient"></div>
+            
+            <div id="radar-player-container" class="player-controls" style="display: none;">
+                <button id="radar-play-btn" class="play-btn" onclick="toggleRadarAnimation()">▶</button>
+                <input type="range" id="radar-slider" class="player-slider" min="0" max="9" value="9" step="1">
+            </div>
+
+            <div class="radar-gradient" style="margin-top: 10px;"></div>
             <div class="radar-labels"><span>Light</span><span>Heavy</span></div>
         </div>
         
@@ -674,8 +680,6 @@
         const countryLayer = L.layerGroup(); 
         const myStateLayer = L.layerGroup();
         
-        let radarLayer = null; 
-        
         let countriesLoaded = false; 
         let myStatesLoaded = false;
 
@@ -744,41 +748,118 @@
         }
 
         // =====================================================================
-        // REMOTE SENSING TOGGLES (RADAR)
+        // NEW RADAR ANIMATION LOGIC
         // =====================================================================
+        let radarFramesData = [];
+        let radarLayers = [];
+        let currentRadarFrameIdx = 0;
+        let radarPlayInterval = null;
+        let isRadarPlaying = false;
+
+        function updateRadarUI(idx) {
+            if (radarFramesData.length === 0) return;
+            
+            // Manage Layers: Only show the active frame to save memory
+            radarLayers.forEach((layer, i) => {
+                if (i === idx) {
+                    if (!map.hasLayer(layer)) layer.addTo(map);
+                } else {
+                    if (map.hasLayer(layer)) map.removeLayer(layer);
+                }
+            });
+
+            // Update Time display
+            const frame = radarFramesData[idx];
+            const dateObj = new Date(frame.time * 1000);
+            const dateStr = dateObj.toISOString().split('T')[0];
+            const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + 'z';
+            const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
+            const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
+            
+            document.getElementById('radar-time').innerHTML = `${dateStr} <br> UTC: ${utcStr} <br> ${mytStr}`;
+            document.getElementById('radar-slider').value = idx;
+        }
+
+        function toggleRadarAnimation() {
+            const btn = document.getElementById('radar-play-btn');
+            if (isRadarPlaying) {
+                clearInterval(radarPlayInterval);
+                btn.textContent = "▶";
+                isRadarPlaying = false;
+            } else {
+                btn.textContent = "⏸";
+                isRadarPlaying = true;
+                
+                // If at the end, restart from beginning
+                if (currentRadarFrameIdx >= radarFramesData.length - 1) {
+                    currentRadarFrameIdx = 0;
+                }
+                
+                updateRadarUI(currentRadarFrameIdx);
+                
+                radarPlayInterval = setInterval(() => {
+                    currentRadarFrameIdx++;
+                    if (currentRadarFrameIdx >= radarFramesData.length) {
+                        currentRadarFrameIdx = 0; // loop back
+                    }
+                    updateRadarUI(currentRadarFrameIdx);
+                }, 1000); // Change frame every 1 second
+            }
+        }
+
+        // Slider manual control for radar
+        document.getElementById('radar-slider').addEventListener('input', (e) => {
+            if (isRadarPlaying) toggleRadarAnimation(); // Pause animation if user drags slider
+            currentRadarFrameIdx = parseInt(e.target.value, 10);
+            updateRadarUI(currentRadarFrameIdx);
+        });
+
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
             const legendDiv = document.getElementById('radar-legend');
+            const playerContainer = document.getElementById('radar-player-container');
+
             if (e.target.checked) {
                 legendDiv.style.display = 'block'; 
                 document.getElementById('radar-time').textContent = "Fetching radar...";
+                
                 fetch('https://api.rainviewer.com/public/weather-maps.json')
                     .then(res => res.json())
                     .then(data => {
-                        const latestScan = data.radar.past[data.radar.past.length - 1]; 
+                        let frames = data.radar.past;
+                        if (frames.length > 10) frames = frames.slice(-10); // Limit to last 10 frames like Satellite
                         
-                        const dateObj = new Date(latestScan.time * 1000);
-                        const dateStr = dateObj.toISOString().split('T')[0];
-                        const utcStr = dateObj.toISOString().split('T')[1].substring(0, 5) + 'z';
+                        radarFramesData = frames;
+                        currentRadarFrameIdx = frames.length - 1; // Default to latest
+
+                        // Setup UI Slider
+                        const slider = document.getElementById('radar-slider');
+                        slider.max = frames.length - 1;
+                        slider.value = currentRadarFrameIdx;
+                        playerContainer.style.display = frames.length > 1 ? 'flex' : 'none';
+
+                        // Create tile layers but don't add to map yet
+                        radarLayers.forEach(l => map.removeLayer(l));
+                        radarLayers = frames.map(frame => {
+                            return L.tileLayer(`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, { 
+                                opacity: 0.65, zIndex: 10, maxNativeZoom: 7, maxZoom: 20
+                            });
+                        });
                         
-                        const mytDate = new Date(dateObj.getTime() + (8 * 60 * 60 * 1000));
-                        const mytStr = String(mytDate.getUTCHours()).padStart(2, '0') + ':' + String(mytDate.getUTCMinutes()).padStart(2, '0') + ' MYT';
-                        
-                        document.getElementById('radar-time').innerHTML = `${dateStr} <br> UTC: ${utcStr} <br> ${mytStr}`;
-                        
-                        if (radarLayer) map.removeLayer(radarLayer);
-                        
-                        radarLayer = L.tileLayer(`${data.host}${latestScan.path}/256/{z}/{x}/{y}/2/1_1.png`, { 
-                            opacity: 0.65, zIndex: 10, maxNativeZoom: 7, maxZoom: 20
-                        }).addTo(map);
-                    }).catch(() => document.getElementById('radar-time').textContent = "Error fetching data.");
+                        updateRadarUI(currentRadarFrameIdx);
+                    }).catch(() => {
+                        document.getElementById('radar-time').textContent = "Error fetching data.";
+                        playerContainer.style.display = 'none';
+                    });
             } else { 
                 legendDiv.style.display = 'none'; 
-                if (radarLayer) map.removeLayer(radarLayer); 
+                if (isRadarPlaying) toggleRadarAnimation();
+                radarLayers.forEach(l => map.removeLayer(l));
+                radarLayers = [];
             }
         });
 
         // =====================================================================
-        // NEW SATELLITE ANIMATION LOGIC
+        // SATELLITE ANIMATION LOGIC
         // =====================================================================
         let satFramesData = [];
         let satLayers = [];
