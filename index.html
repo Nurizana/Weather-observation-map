@@ -976,7 +976,7 @@
         });
 
         // =====================================================================
-        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER (GITHUB API MONITORING)
+        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER (MULTI-TC SUPPORT)
         // =====================================================================
         const tcTrackLayer = L.featureGroup();
         const tcConeLayer = L.featureGroup();
@@ -1005,45 +1005,68 @@
             const subToggles = document.querySelectorAll('.tc-sub-toggle');
 
             if (e.target.checked) {
+                if (tcKmzLoaded) {
+                    // Data already fetched and parsed, just show it
+                    map.addLayer(tcTrackLayer);
+                    map.addLayer(tcConeLayer);
+                    map.addLayer(tcCenterLayer);
+                    legendDiv.innerHTML = originalLegendHTML;
+                    legendDiv.style.display = 'block';
+                    subToggles.forEach(cb => { cb.disabled = false; cb.checked = true; });
+                    return;
+                }
+
                 // Show a loading message while we check the server
                 legendDiv.style.display = 'block';
                 legendDiv.innerHTML = `<strong style="color:#0056b3;">Checking TC Status...</strong>`;
                 
                 let isTCActive = false;
+                let activeKmzPaths = [];
 
                 try {
-                    // NEW METHOD: Use GitHub API to bypass CDN caching of HTTP headers.
-                    // This accurately checks the last commit time for this specific file.
                     const owner = 'Nurizana'; // Make sure this matches your GitHub username
-                    const repo = 'Weather-observation-map'; // Make sure this matches your repo name
-                    const path = 'tc_data/latest_tc.kmz';
+                    const repo = 'Weather-observation-map'; // Repo name
+                    const folderPath = 'tc_data';
                     
-                    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?path=${path}&page=1&per_page=1`;
-                    const response = await fetch(apiUrl);
+                    // 1. Fetch contents of the tc_data directory
+                    const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${folderPath}`;
+                    const response = await fetch(contentsUrl);
+                    if (!response.ok) throw new Error('Could not fetch folder contents from GitHub API');
+                    const files = await response.json();
                     
-                    if (!response.ok) throw new Error('Could not fetch commit history from GitHub API');
-                    const commitData = await response.json();
-                    
-                    if (commitData && commitData.length > 0) {
-                        const lastModifiedDateStr = commitData[0].commit.committer.date;
-                        const lastModified = new Date(lastModifiedDateStr);
-                        const now = new Date();
-                        const hoursOld = (now - lastModified) / (1000 * 60 * 60);
+                    // 2. Filter for all .kmz files
+                    const kmzFiles = files.filter(f => f.name.endsWith('.kmz'));
 
-                        // Set active only if the file was updated within the last 24 hours
-                        if (hoursOld <= 24) {
-                            isTCActive = true;
+                    // 3. Check commit history for EACH kmz file
+                    await Promise.all(kmzFiles.map(async (file) => {
+                        const commitUrl = `https://api.github.com/repos/${owner}/${repo}/commits?path=${file.path}&page=1&per_page=1`;
+                        try {
+                            const commitRes = await fetch(commitUrl);
+                            const commitData = await commitRes.json();
+                            
+                            if (commitData && commitData.length > 0) {
+                                const lastModifiedDateStr = commitData[0].commit.committer.date;
+                                const lastModified = new Date(lastModifiedDateStr);
+                                const now = new Date();
+                                const hoursOld = (now - lastModified) / (1000 * 60 * 60);
+
+                                // Set active only if the file was updated within the last 24 hours
+                                if (hoursOld <= 24) {
+                                    activeKmzPaths.push(`tc_data/${file.name}`);
+                                    isTCActive = true;
+                                }
+                            }
+                        } catch (err) {
+                            console.warn(`Error checking commit for ${file.name}:`, err.message);
                         }
-                    } else {
-                        throw new Error('No commits found for the specified file.');
-                    }
+                    }));
                 } catch (err) {
-                    console.warn("TC Data Check:", err.message);
+                    console.warn("TC Data Check Error:", err.message);
                     isTCActive = false;
                 }
 
                 // --- EXECUTE UI BASED ON STATUS ---
-                if (!isTCActive) {
+                if (!isTCActive || activeKmzPaths.length === 0) {
                     // Trigger the notification
                     alert("No Active TC In The Region.");
                     
@@ -1065,7 +1088,8 @@
                 legendDiv.innerHTML = originalLegendHTML;
                 subToggles.forEach(cb => { cb.disabled = false; cb.checked = true; });
 
-                if (!tcKmzLoaded) {
+                // Load each active KMZ file dynamically
+                activeKmzPaths.forEach(path => {
                     const kmzParser = L.kmzLayer();
                     
                     kmzParser.on('load', function(evt) {
@@ -1079,20 +1103,16 @@
                                 tcCenterLayer.addLayer(layer);
                             }
                         });
-                        
-                        map.addLayer(tcTrackLayer);
-                        map.addLayer(tcConeLayer);
-                        map.addLayer(tcCenterLayer);
                     });
                     
-                    // Load the verified active file
-                    kmzParser.load(`tc_data/latest_tc.kmz?t=${new Date().getTime()}`);
-                    tcKmzLoaded = true;
-                } else {
-                    map.addLayer(tcTrackLayer);
-                    map.addLayer(tcConeLayer);
-                    map.addLayer(tcCenterLayer);
-                }
+                    // Load the verified active files
+                    kmzParser.load(`${path}?t=${new Date().getTime()}`);
+                });
+
+                map.addLayer(tcTrackLayer);
+                map.addLayer(tcConeLayer);
+                map.addLayer(tcCenterLayer);
+                tcKmzLoaded = true; // Prevent redundant network requests if toggled off and on again
 
             } else {
                 // WHEN CHECKBOX IS UNCHECKED MANUALLY
