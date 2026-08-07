@@ -407,9 +407,9 @@
             <div id="menu-tc" class="menu-panel narrow">
                 <label><input type="checkbox" id="toggle-tc-all"> <b>Enable TC Data</b></label>
                 <div class="menu-separator"></div>
-                <label><input type="checkbox" class="tc-sub-toggle" id="toggle-tc-track" disabled> Forecast Track</label>
-                <label><input type="checkbox" class="tc-sub-toggle" id="toggle-tc-cone" disabled> Cone of Uncertainty</label>
-                <label><input type="checkbox" class="tc-sub-toggle" id="toggle-tc-center" disabled> Storm Center</label>
+                <div id="dynamic-tc-list">
+                    <div style="font-size: 11px; color: #777;">Check "Enable TC Data" to fetch active cyclones.</div>
+                </div>
             </div>
         </div>
 
@@ -444,12 +444,11 @@
         // =====================================================================
         let inactivityTimer;
         let countdownInterval;
-        const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes in milliseconds
-        const COUNTDOWN_LIMIT = 15; // 15 seconds
+        const INACTIVITY_LIMIT = 10 * 60 * 1000; 
+        const COUNTDOWN_LIMIT = 15; 
 
         function startSessionMonitor() {
             stopSessionMonitor();
-            
             ['mousemove', 'mousedown', 'keypress', 'touchstart', 'scroll'].forEach(evt => {
                 document.addEventListener(evt, resetActivityTimer, { passive: true });
             });
@@ -759,7 +758,6 @@
         function updateRadarUI(idx) {
             if (radarFramesData.length === 0) return;
             
-            // Manage Layers: Only show the active frame to save memory
             radarLayers.forEach((layer, i) => {
                 if (i === idx) {
                     if (!map.hasLayer(layer)) layer.addTo(map);
@@ -768,7 +766,6 @@
                 }
             });
 
-            // Update Time display
             const frame = radarFramesData[idx];
             const dateObj = new Date(frame.time * 1000);
             const dateStr = dateObj.toISOString().split('T')[0];
@@ -789,27 +786,19 @@
             } else {
                 btn.textContent = "⏸";
                 isRadarPlaying = true;
-                
-                // If at the end, restart from beginning
-                if (currentRadarFrameIdx >= radarFramesData.length - 1) {
-                    currentRadarFrameIdx = 0;
-                }
+                if (currentRadarFrameIdx >= radarFramesData.length - 1) currentRadarFrameIdx = 0;
                 
                 updateRadarUI(currentRadarFrameIdx);
-                
                 radarPlayInterval = setInterval(() => {
                     currentRadarFrameIdx++;
-                    if (currentRadarFrameIdx >= radarFramesData.length) {
-                        currentRadarFrameIdx = 0; // loop back
-                    }
+                    if (currentRadarFrameIdx >= radarFramesData.length) currentRadarFrameIdx = 0;
                     updateRadarUI(currentRadarFrameIdx);
-                }, 1000); // Change frame every 1 second
+                }, 1000); 
             }
         }
 
-        // Slider manual control for radar
         document.getElementById('radar-slider').addEventListener('input', (e) => {
-            if (isRadarPlaying) toggleRadarAnimation(); // Pause animation if user drags slider
+            if (isRadarPlaying) toggleRadarAnimation(); 
             currentRadarFrameIdx = parseInt(e.target.value, 10);
             updateRadarUI(currentRadarFrameIdx);
         });
@@ -826,18 +815,16 @@
                     .then(res => res.json())
                     .then(data => {
                         let frames = data.radar.past;
-                        if (frames.length > 10) frames = frames.slice(-10); // Limit to last 10 frames like Satellite
+                        if (frames.length > 10) frames = frames.slice(-10); 
                         
                         radarFramesData = frames;
-                        currentRadarFrameIdx = frames.length - 1; // Default to latest
+                        currentRadarFrameIdx = frames.length - 1; 
 
-                        // Setup UI Slider
                         const slider = document.getElementById('radar-slider');
                         slider.max = frames.length - 1;
                         slider.value = currentRadarFrameIdx;
                         playerContainer.style.display = frames.length > 1 ? 'flex' : 'none';
 
-                        // Create tile layers but don't add to map yet
                         radarLayers.forEach(l => map.removeLayer(l));
                         radarLayers = frames.map(frame => {
                             return L.tileLayer(`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, { 
@@ -870,7 +857,6 @@
         function updateSatelliteUI(idx) {
             if (satFramesData.length === 0) return;
             
-            // Manage Layers: Only show the active frame to save memory
             satLayers.forEach((layer, i) => {
                 if (i === idx) {
                     if (!map.hasLayer(layer)) layer.addTo(map);
@@ -879,7 +865,6 @@
                 }
             });
 
-            // Update Time display
             const frame = satFramesData[idx];
             const dateObj = new Date(frame.time);
             const dateStr = dateObj.toISOString().split('T')[0];
@@ -900,27 +885,20 @@
             } else {
                 btn.textContent = "⏸";
                 isSatPlaying = true;
-                
-                // If at the end, restart from beginning
-                if (currentSatFrameIdx >= satFramesData.length - 1) {
-                    currentSatFrameIdx = 0;
-                }
+                if (currentSatFrameIdx >= satFramesData.length - 1) currentSatFrameIdx = 0;
                 
                 updateSatelliteUI(currentSatFrameIdx);
                 
                 satPlayInterval = setInterval(() => {
                     currentSatFrameIdx++;
-                    if (currentSatFrameIdx >= satFramesData.length) {
-                        currentSatFrameIdx = 0; // loop back
-                    }
+                    if (currentSatFrameIdx >= satFramesData.length) currentSatFrameIdx = 0; 
                     updateSatelliteUI(currentSatFrameIdx);
-                }, 1000); // Change frame every 1 second
+                }, 1000); 
             }
         }
 
-        // Slider manual control
         document.getElementById('sat-slider').addEventListener('input', (e) => {
-            if (isSatPlaying) toggleSatAnimation(); // Pause animation if user drags slider
+            if (isSatPlaying) toggleSatAnimation(); 
             currentSatFrameIdx = parseInt(e.target.value, 10);
             updateSatelliteUI(currentSatFrameIdx);
         });
@@ -938,25 +916,21 @@
                     .then(res => res.json())
                     .then(data => {
                         let frames = Array.isArray(data) ? data : [data];
-                        if (frames.length > 10) frames = frames.slice(-10); // Enforce max 10
+                        if (frames.length > 10) frames = frames.slice(-10); 
                         
                         satFramesData = frames;
-                        currentSatFrameIdx = frames.length - 1; // Default to latest
+                        currentSatFrameIdx = frames.length - 1;
 
-                        // Setup UI Slider
                         const slider = document.getElementById('sat-slider');
                         slider.max = frames.length - 1;
                         slider.value = currentSatFrameIdx;
                         playerContainer.style.display = frames.length > 1 ? 'flex' : 'none';
 
-                        // Create image overlays but don't add to map yet
                         satLayers.forEach(l => map.removeLayer(l));
                         satLayers = frames.map(frame => {
                             const imgPath = frame.image ? `${frame.image}?t=${cacheBuster}` : `imerg_latest.png?t=${cacheBuster}`;
                             return L.imageOverlay(imgPath, [[-60, -180], [60, 180]], {
-                                opacity: 0.65,
-                                interactive: false,
-                                zIndex: 9 
+                                opacity: 0.65, interactive: false, zIndex: 9 
                             });
                         });
 
@@ -967,7 +941,6 @@
                         document.getElementById('satellite-time').innerHTML = `<span style="color:red">Failed to load data.</span>`;
                     });
             } else {
-                // Cleanup on hide
                 legendDiv.style.display = 'none';
                 if (isSatPlaying) toggleSatAnimation();
                 satLayers.forEach(l => map.removeLayer(l));
@@ -976,14 +949,11 @@
         });
 
         // =====================================================================
-        // TC FORECAST TRACK JTWC - ADVANCED KMZ HANDLER (MULTI-TC SUPPORT)
+        // HIERARCHICAL TC FORECAST TRACK JTWC - DYNAMIC KMZ HANDLER
         // =====================================================================
-        const tcTrackLayer = L.featureGroup();
-        const tcConeLayer = L.featureGroup();
-        const tcCenterLayer = L.featureGroup();
-        let tcKmzLoaded = false;
+        let activeTCs = {}; 
+        let tcDataFetched = false;
         
-        // Stored HTML templates for the legend
         const originalLegendHTML = `
             <strong style="color:#cc0000;">TC Forecast Track JTWC</strong><br>
             <div style="font-size: 11px; margin-top: 5px; line-height: 1.5;">
@@ -1002,42 +972,41 @@
 
         document.getElementById('toggle-tc-all').addEventListener('change', async (e) => {
             const legendDiv = document.getElementById('tc-legend');
-            const subToggles = document.querySelectorAll('.tc-sub-toggle');
+            const dynamicList = document.getElementById('dynamic-tc-list');
 
             if (e.target.checked) {
-                if (tcKmzLoaded) {
-                    // Data already fetched and parsed, just show it
-                    map.addLayer(tcTrackLayer);
-                    map.addLayer(tcConeLayer);
-                    map.addLayer(tcCenterLayer);
+                if (tcDataFetched) {
+                    // Data already fetched and parsed, just re-add to map and check boxes
+                    Object.values(activeTCs).forEach(tc => {
+                        if (!map.hasLayer(tc.track)) map.addLayer(tc.track);
+                        if (!map.hasLayer(tc.cone)) map.addLayer(tc.cone);
+                        if (!map.hasLayer(tc.center)) map.addLayer(tc.center);
+                    });
+                    document.querySelectorAll('.tc-master-toggle, .tc-sub-toggle').forEach(cb => { cb.checked = true; cb.disabled = false; });
                     legendDiv.innerHTML = originalLegendHTML;
                     legendDiv.style.display = 'block';
-                    subToggles.forEach(cb => { cb.disabled = false; cb.checked = true; });
                     return;
                 }
 
                 // Show a loading message while we check the server
                 legendDiv.style.display = 'block';
                 legendDiv.innerHTML = `<strong style="color:#0056b3;">Checking TC Status...</strong>`;
+                dynamicList.innerHTML = `<div style="font-size: 12px; color: #0056b3;">Fetching data...</div>`;
                 
-                let isTCActive = false;
-                let activeKmzPaths = [];
+                let activeKmzFiles = [];
 
                 try {
-                    const owner = 'Nurizana'; // Make sure this matches your GitHub username
-                    const repo = 'Weather-observation-map'; // Repo name
+                    const owner = 'Nurizana'; 
+                    const repo = 'Weather-observation-map'; 
                     const folderPath = 'tc_data';
                     
-                    // 1. Fetch contents of the tc_data directory
                     const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${folderPath}`;
                     const response = await fetch(contentsUrl);
                     if (!response.ok) throw new Error('Could not fetch folder contents from GitHub API');
                     const files = await response.json();
                     
-                    // 2. Filter for all .kmz files
                     const kmzFiles = files.filter(f => f.name.endsWith('.kmz'));
 
-                    // 3. Check commit history for EACH kmz file
                     await Promise.all(kmzFiles.map(async (file) => {
                         const commitUrl = `https://api.github.com/repos/${owner}/${repo}/commits?path=${file.path}&page=1&per_page=1`;
                         try {
@@ -1050,10 +1019,12 @@
                                 const now = new Date();
                                 const hoursOld = (now - lastModified) / (1000 * 60 * 60);
 
-                                // Set active only if the file was updated within the last 24 hours
                                 if (hoursOld <= 24) {
-                                    activeKmzPaths.push(`tc_data/${file.name}`);
-                                    isTCActive = true;
+                                    // Extract ID from filename (e.g. wp1326 from wp1326_2026070900.kmz)
+                                    const idMatch = file.name.match(/^([a-zA-Z0-9]+)_/);
+                                    const tcId = idMatch ? idMatch[1].toUpperCase() : file.name.split('.')[0].toUpperCase();
+                                    
+                                    activeKmzFiles.push({ id: tcId, path: `tc_data/${file.name}` });
                                 }
                             }
                         } catch (err) {
@@ -1062,20 +1033,15 @@
                     }));
                 } catch (err) {
                     console.warn("TC Data Check Error:", err.message);
-                    isTCActive = false;
                 }
 
                 // --- EXECUTE UI BASED ON STATUS ---
-                if (!isTCActive || activeKmzPaths.length === 0) {
-                    // Trigger the notification
+                if (activeKmzFiles.length === 0) {
                     alert("No Active TC In The Region.");
-                    
-                    // Show inactive legend, disable sub-options, and uncheck the main box
                     legendDiv.innerHTML = inactiveLegendHTML;
                     e.target.checked = false; 
-                    subToggles.forEach(cb => { cb.disabled = true; cb.checked = false; });
+                    dynamicList.innerHTML = `<div style="font-size: 11px; color: #777;">No active cyclones.</div>`;
                     
-                    // Hide the legend box entirely after 3 seconds
                     setTimeout(() => { 
                         if(!document.getElementById('toggle-tc-all').checked) {
                             legendDiv.style.display = 'none'; 
@@ -1084,58 +1050,109 @@
                     return;
                 }
 
-                // STORM IS ACTIVE: Load and display data
                 legendDiv.innerHTML = originalLegendHTML;
-                subToggles.forEach(cb => { cb.disabled = false; cb.checked = true; });
+                dynamicList.innerHTML = ''; // Clear loading text
 
-                // Load each active KMZ file dynamically
-                activeKmzPaths.forEach(path => {
-                    const kmzParser = L.kmzLayer();
+                // Process Active Files & Build Dynamic Checkboxes
+                activeKmzFiles.forEach(fileInfo => {
+                    const tcId = fileInfo.id;
+                    activeTCs[tcId] = { track: L.featureGroup(), cone: L.featureGroup(), center: L.featureGroup() };
                     
+                    const tcDiv = document.createElement('div');
+                    tcDiv.style.marginBottom = "8px";
+                    tcDiv.style.borderBottom = "1px dashed #ccc";
+                    tcDiv.style.paddingBottom = "5px";
+
+                    tcDiv.innerHTML = `
+                        <label style="font-weight:bold; color:#0056b3;"><input type="checkbox" class="tc-master-toggle" data-tcid="${tcId}" checked> ${tcId}</label>
+                        <div style="margin-left: 15px; display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+                            <label><input type="checkbox" class="tc-sub-toggle" data-tcid="${tcId}" data-layer="track" checked> Forecast Track</label>
+                            <label><input type="checkbox" class="tc-sub-toggle" data-tcid="${tcId}" data-layer="cone" checked> Cone of Uncertainty</label>
+                            <label><input type="checkbox" class="tc-sub-toggle" data-tcid="${tcId}" data-layer="center" checked> Storm Center</label>
+                        </div>
+                    `;
+                    dynamicList.appendChild(tcDiv);
+
+                    // Load KMZ per TC
+                    const kmzParser = L.kmzLayer();
                     kmzParser.on('load', function(evt) {
-                        const parsedLayer = evt.layer;
-                        parsedLayer.eachLayer(layer => {
+                        evt.layer.eachLayer(layer => {
                             if (layer instanceof L.Polygon) {
-                                tcConeLayer.addLayer(layer);
+                                activeTCs[tcId].cone.addLayer(layer);
                             } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-                                tcTrackLayer.addLayer(layer);
+                                activeTCs[tcId].track.addLayer(layer);
                             } else if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
-                                tcCenterLayer.addLayer(layer);
+                                activeTCs[tcId].center.addLayer(layer);
                             }
                         });
+                        map.addLayer(activeTCs[tcId].track);
+                        map.addLayer(activeTCs[tcId].cone);
+                        map.addLayer(activeTCs[tcId].center);
                     });
                     
-                    // Load the verified active files
-                    kmzParser.load(`${path}?t=${new Date().getTime()}`);
+                    kmzParser.load(`${fileInfo.path}?t=${new Date().getTime()}`);
                 });
 
-                map.addLayer(tcTrackLayer);
-                map.addLayer(tcConeLayer);
-                map.addLayer(tcCenterLayer);
-                tcKmzLoaded = true; // Prevent redundant network requests if toggled off and on again
+                tcDataFetched = true; 
+                attachDynamicListeners();
 
             } else {
-                // WHEN CHECKBOX IS UNCHECKED MANUALLY
+                // WHEN CHECKBOX IS UNCHECKED MANUALLY -> Remove everything
                 legendDiv.style.display = 'none';
-                subToggles.forEach(cb => { cb.disabled = true; cb.checked = false; });
-                map.removeLayer(tcTrackLayer);
-                map.removeLayer(tcConeLayer);
-                map.removeLayer(tcCenterLayer);
+                document.querySelectorAll('.tc-master-toggle, .tc-sub-toggle').forEach(cb => { cb.checked = false; cb.disabled = true; });
+                
+                Object.values(activeTCs).forEach(tc => {
+                    if (map.hasLayer(tc.track)) map.removeLayer(tc.track);
+                    if (map.hasLayer(tc.cone)) map.removeLayer(tc.cone);
+                    if (map.hasLayer(tc.center)) map.removeLayer(tc.center);
+                });
             }
         });
 
-        // Individual Component Toggles
-        document.getElementById('toggle-tc-track').addEventListener('change', (e) => {
-            e.target.checked ? map.addLayer(tcTrackLayer) : map.removeLayer(tcTrackLayer);
-        });
+        // Attach listeners for dynamic sub-toggles
+        function attachDynamicListeners() {
+            document.querySelectorAll('.tc-master-toggle').forEach(masterCb => {
+                masterCb.addEventListener('change', (e) => {
+                    const tcId = e.target.getAttribute('data-tcid');
+                    const isChecked = e.target.checked;
+                    
+                    document.querySelectorAll(`.tc-sub-toggle[data-tcid="${tcId}"]`).forEach(subCb => {
+                        subCb.checked = isChecked;
+                    });
 
-        document.getElementById('toggle-tc-cone').addEventListener('change', (e) => {
-            e.target.checked ? map.addLayer(tcConeLayer) : map.removeLayer(tcConeLayer);
-        });
+                    const tc = activeTCs[tcId];
+                    if (isChecked) {
+                        map.addLayer(tc.track);
+                        map.addLayer(tc.cone);
+                        map.addLayer(tc.center);
+                    } else {
+                        map.removeLayer(tc.track);
+                        map.removeLayer(tc.cone);
+                        map.removeLayer(tc.center);
+                    }
+                });
+            });
 
-        document.getElementById('toggle-tc-center').addEventListener('change', (e) => {
-            e.target.checked ? map.addLayer(tcCenterLayer) : map.removeLayer(tcCenterLayer);
-        });
+            document.querySelectorAll('.tc-sub-toggle').forEach(subCb => {
+                subCb.addEventListener('change', (e) => {
+                    const tcId = e.target.getAttribute('data-tcid');
+                    const layerType = e.target.getAttribute('data-layer');
+                    const isChecked = e.target.checked;
+                    
+                    const tc = activeTCs[tcId];
+                    if (isChecked) {
+                        map.addLayer(tc[layerType]);
+                    } else {
+                        map.removeLayer(tc[layerType]);
+                    }
+
+                    // Auto-adjust master checkbox state based on sub-checks
+                    const anySubChecked = Array.from(document.querySelectorAll(`.tc-sub-toggle[data-tcid="${tcId}"]`)).some(cb => cb.checked);
+                    document.querySelector(`.tc-master-toggle[data-tcid="${tcId}"]`).checked = anySubChecked;
+                });
+            });
+        }
+
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
         
