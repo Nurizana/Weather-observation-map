@@ -1038,10 +1038,10 @@
                                 const hoursOld = (now - lastModified) / (1000 * 60 * 60);
 
                                 if (hoursOld <= 24) {
-                                    const idMatch = file.name.match(/^([a-zA-Z]+[0-9]{2,4})/);
-                                    const tcId = idMatch ? idMatch[1].toUpperCase() : file.name.split('.')[0].toUpperCase();
+                                    // REVISED: Extract entire filename dynamically as ID without stripping new suffix logic
+                                    const tcId = file.name.replace('.kmz', '').toUpperCase();
                                     
-                                    activeKmzFiles.push({ id: tcId, path: `tc_data/${file.name}` });
+                                    activeKmzFiles.push({ id: tcId, path: file.path });
                                 }
                             }
                         } catch (err) {
@@ -1113,7 +1113,11 @@
                         map.addLayer(activeTCs[tcId].center);
                     });
                     
-                    kmzParser.load(`${fileInfo.path}?t=${new Date().getTime()}`);
+                    // REVISED: Fetch explicitly from raw.githubusercontent.com to avoid relative path lookup errors
+                    const owner = 'Nurizana'; 
+                    const repo = 'Weather-observation-map'; 
+                    const kmzUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${fileInfo.path}?t=${new Date().getTime()}`;
+                    kmzParser.load(kmzUrl);
                 });
 
                 tcDataFetched = true; 
