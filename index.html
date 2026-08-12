@@ -1011,7 +1011,7 @@
                 legendDiv.innerHTML = `<strong style="color:#0056b3;">Checking TC Status...</strong>`;
                 dynamicListContainer.innerHTML = `<div style="font-size: 12px; color: #0056b3;">Fetching data...</div>`;
                 
-                let activeKmzFiles = [];
+                let latestTcFiles = {};
 
                 try {
                     const owner = 'Nurizana'; 
@@ -1023,7 +1023,8 @@
                     if (!response.ok) throw new Error('Could not fetch folder contents from GitHub API');
                     const files = await response.json();
                     
-                    const kmzFiles = files.filter(f => f.name.endsWith('.kmz'));
+                    // Filter specifically for files starting with 'wp' to match the repo updates
+                    const kmzFiles = files.filter(f => f.name.endsWith('.kmz') && f.name.match(/^wp\d{4}/i));
 
                     await Promise.all(kmzFiles.map(async (file) => {
                         const commitUrl = `https://api.github.com/repos/${owner}/${repo}/commits?path=${file.path}&page=1&per_page=1`;
@@ -1037,10 +1038,15 @@
                                 const now = new Date();
                                 const hoursOld = (now - lastModified) / (1000 * 60 * 60);
 
-                                if (hoursOld <= 24) {
-                                    const tcId = file.name.replace('.kmz', '').toUpperCase();
+                                if (hoursOld <= 48) { // Configured to accommodate reasonable updates
+                                    // Groups files like wp1326_16 and wp1326_20 into a single WP1326 ID entry
+                                    const tcIdMatch = file.name.match(/^(wp\d{4})/i);
+                                    const tcId = tcIdMatch ? tcIdMatch[1].toUpperCase() : file.name.replace('.kmz', '').toUpperCase();
                                     
-                                    activeKmzFiles.push({ id: tcId, path: file.path });
+                                    // Retain only the most recent commit version for each TC group
+                                    if (!latestTcFiles[tcId] || latestTcFiles[tcId].lastModified < lastModified) {
+                                        latestTcFiles[tcId] = { id: tcId, path: file.path, lastModified: lastModified };
+                                    }
                                 }
                             }
                         } catch (err) {
@@ -1050,6 +1056,8 @@
                 } catch (err) {
                     console.warn("TC Data Check Error:", err.message);
                 }
+
+                let activeKmzFiles = Object.values(latestTcFiles);
 
                 if (activeKmzFiles.length === 0) {
                     alert("No Active TC In The Region.");
@@ -1112,7 +1120,6 @@
                         map.addLayer(activeTCs[tcId].center);
                     });
                     
-                    // REVISED: Fetch via relative path to avoid CORS issues on GitHub Pages
                     kmzParser.load(`${fileInfo.path}?t=${new Date().getTime()}`);
                 });
 
@@ -1191,7 +1198,6 @@
                 });
             });
         }
-
 
         const apiKey = 'eae5ff84ba6f569b65934b8b1ac8abc3';
         
