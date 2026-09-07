@@ -12,10 +12,31 @@
         /* ---------------------------------------------------
            GLOBAL & LAYOUT
            --------------------------------------------------- */
-        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; height: 100%; overflow: hidden; background: #111; }
+        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; height: 100%; overflow: hidden; background: #111; transition: opacity 0.2s ease; }
         #map { width: 100vw; height: 100vh; z-index: 1; }
         
         * { box-sizing: border-box; }
+
+        /* ---------------------------------------------------
+           SECURITY LOCK STYLES
+           --------------------------------------------------- */
+        .security-lock {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        .security-lock input {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        
+        .security-lock img {
+            -webkit-user-drag: none;
+        }
 
         /* ---------------------------------------------------
            APP TITLE
@@ -425,6 +446,53 @@
     
     <script>
         // =====================================================================
+        // SECURITY FEATURES (NO SOURCE, NO DOWNLOAD, NO PRINTSCREEN)
+        // =====================================================================
+        function preventContextMenu(e) { e.preventDefault(); }
+        function preventDrag(e) { e.preventDefault(); }
+        function preventShortcuts(e) {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+            
+            // F12, Ctrl+Shift+I/J/C
+            if (e.key === 'F12' || (cmdOrCtrl && e.shiftKey && ['I', 'J', 'C', 'i', 'j', 'c'].includes(e.key))) {
+                e.preventDefault();
+            }
+            // Ctrl+U, Ctrl+S, Ctrl+P, Ctrl+C
+            if (cmdOrCtrl && ['U', 'S', 'P', 'C', 'u', 's', 'p', 'c'].includes(e.key)) {
+                e.preventDefault();
+            }
+            // PrintScreen
+            if (e.key === 'PrintScreen') {
+                navigator.clipboard.writeText('Screenshots disabled for security.');
+                e.preventDefault();
+            }
+        }
+        function obscureScreen() { document.body.style.opacity = '0'; }
+        function revealScreen() { document.body.style.opacity = '1'; }
+
+        function enableSecurityRestrictions() {
+            document.addEventListener('contextmenu', preventContextMenu);
+            document.addEventListener('dragstart', preventDrag);
+            document.addEventListener('keydown', preventShortcuts);
+            window.addEventListener('blur', obscureScreen);
+            window.addEventListener('focus', revealScreen);
+        }
+
+        function disableSecurityRestrictions() {
+            document.removeEventListener('contextmenu', preventContextMenu);
+            document.removeEventListener('dragstart', preventDrag);
+            document.removeEventListener('keydown', preventShortcuts);
+            window.removeEventListener('blur', obscureScreen);
+            window.removeEventListener('focus', revealScreen);
+            revealScreen();
+        }
+
+        // Apply immediately to protect the login screen before Auth resolves
+        enableSecurityRestrictions();
+
+
+        // =====================================================================
         // FIREBASE CONFIGURATION 
         // =====================================================================
         const firebaseConfig = {
@@ -517,10 +585,10 @@
 
                 if (user.email === adminEmail) {
                     document.body.classList.remove('security-lock');
-                    document.removeEventListener('keyup', screenshotBlocker);
+                    disableSecurityRestrictions();
                 } else {
                     document.body.classList.add('security-lock');
-                    document.addEventListener('keyup', screenshotBlocker);
+                    enableSecurityRestrictions();
                 }
                 
                 startSessionMonitor();
@@ -529,6 +597,7 @@
                 document.getElementById('auth-overlay').style.display = 'flex';
                 document.getElementById('user-profile').style.display = 'none';
                 document.body.classList.add('security-lock', 'no-print');
+                enableSecurityRestrictions(); // ensure lock is on for unauthenticated users
                 stopSessionMonitor();
             }
         });
@@ -563,13 +632,6 @@
                 document.getElementById('log-pass').value = "";
                 msgBox.textContent = "You have been logged out due to session expiration or user action.";
             });
-        }
-
-        function screenshotBlocker(e) {
-            if (e.key === 'PrintScreen') {
-                navigator.clipboard.writeText('Screenshots disabled for security.');
-                alert("Screenshots are disabled for this dashboard.");
-            }
         }
 
         // =====================================================================
@@ -1023,7 +1085,6 @@
                     if (!response.ok) throw new Error('Could not fetch folder contents from GitHub API');
                     const files = await response.json();
                     
-                    // Filter specifically for files starting with 'wp' to match the repo updates
                     const kmzFiles = files.filter(f => f.name.endsWith('.kmz') && f.name.match(/^wp\d{4}/i));
 
                     await Promise.all(kmzFiles.map(async (file) => {
@@ -1038,12 +1099,10 @@
                                 const now = new Date();
                                 const hoursOld = (now - lastModified) / (1000 * 60 * 60);
 
-                                if (hoursOld <= 48) { // Configured to accommodate reasonable updates
-                                    // Groups files like wp1326_16 and wp1326_20 into a single WP1326 ID entry
+                                if (hoursOld <= 48) { 
                                     const tcIdMatch = file.name.match(/^(wp\d{4})/i);
                                     const tcId = tcIdMatch ? tcIdMatch[1].toUpperCase() : file.name.replace('.kmz', '').toUpperCase();
                                     
-                                    // Retain only the most recent commit version for each TC group
                                     if (!latestTcFiles[tcId] || latestTcFiles[tcId].lastModified < lastModified) {
                                         latestTcFiles[tcId] = { id: tcId, path: file.path, lastModified: lastModified };
                                     }
