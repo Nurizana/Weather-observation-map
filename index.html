@@ -263,7 +263,7 @@
     <div id="timeout-warning">
         <div class="timeout-box">
             <h3>⚠️ Session Expiring</h3>
-            <p>You have been inactive. You will be logged out in <br><span id="timeout-countdown">15</span> seconds.</p>
+            <p>You have been inactive. You will be logged out in <br><span id="timeout-countdown">7</span> seconds.</p>
             <button onclick="resetActivityTimer()">Keep Me Logged In</button>
         </div>
     </div>
@@ -515,8 +515,8 @@
         // =====================================================================
         let inactivityTimer;
         let countdownInterval;
-        const INACTIVITY_LIMIT = 10 * 60 * 1000; 
-        const COUNTDOWN_LIMIT = 15; 
+        const INACTIVITY_LIMIT = 5 * 60 * 1000;  // Changed to 5 minutes
+        const COUNTDOWN_LIMIT = 7;               // Changed to 7 seconds
 
         function startSessionMonitor() {
             stopSessionMonitor();
