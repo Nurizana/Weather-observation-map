@@ -63,14 +63,58 @@
            --------------------------------------------------- */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: #222; z-index: 9999; display: flex; flex-direction: column;
+            background: linear-gradient(45deg, #0a0a0a, #1a2a3a, #001122);
+            background-size: 400% 400%;
+            animation: aiGradient 15s ease infinite;
+            z-index: 9999; display: flex; flex-direction: column;
             justify-content: center; align-items: center; overflow-y: auto; padding: 20px;
         }
         
+        /* AI GIS Animated Background Grid */
+        #auth-overlay::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 229, 255, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 229, 255, 0.15) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: gridMove 3s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes aiGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes gridMove {
+            0% { background-position: 0 0; }
+            100% { background-position: 40px 40px; }
+        }
+
+        .auth-main-title {
+            position: relative;
+            z-index: 1;
+            color: #00e5ff;
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+            margin-bottom: 30px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
         .auth-container { 
+            position: relative;
+            z-index: 1;
             display: flex; gap: 40px; max-width: 800px; width: 100%; 
             justify-content: center; flex-wrap: wrap; 
         }
+        
         .auth-column { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 320px; }
 
         .auth-header { width: 100%; padding: 20px 10px; text-align: center; font-weight: bold; font-size: 16px; border: 1px solid #333; }
@@ -94,7 +138,11 @@
         .auth-btn { padding: 10px 20px; font-weight: bold; cursor: pointer; border: 1px solid #333; border-radius: 4px; margin-top: 10px; background: white; transition: 0.2s;}
         .auth-btn:hover { background: #eee; }
         
-        #auth-message { margin-top: 30px; color: white; font-size: 15px; text-align: center; min-height: 30px; line-height: 1.4; max-width: 600px; }
+        #auth-message { 
+            position: relative;
+            z-index: 1;
+            margin-top: 30px; color: white; font-size: 15px; text-align: center; min-height: 30px; line-height: 1.4; max-width: 600px; 
+        }
 
         /* ---------------------------------------------------
            TIMEOUT WARNING OVERLAY
@@ -269,6 +317,7 @@
     </div>
 
     <div id="auth-overlay">
+        <h1 class="auth-main-title">Nuri PILOT GIS WEB</h1>
         <div class="auth-container">
             <div class="auth-column">
                 <div class="auth-header reg-header">First Time User Registrations</div>
