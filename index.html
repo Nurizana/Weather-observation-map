@@ -59,53 +59,77 @@
         }
 
         /* ---------------------------------------------------
-           SECURITY / AUTHENTICATION OVERLAY - 3D Spinning Earth
+           SECURITY / AUTHENTICATION OVERLAY - Modern AI GIS Theme
            --------------------------------------------------- */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            /* Deep space background */
-            background: #000811; 
+            /* Modern GIS dark background with a subtle cyan data grid */
+            background: #020611;
+            background-image: 
+                linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: center center;
             z-index: 9999; display: flex; flex-direction: column;
             justify-content: center; align-items: center; overflow-y: auto; padding: 20px;
             overflow: hidden;
         }
 
+        /* Spinning Holographic Earth */
         #auth-overlay::before {
             content: "";
             position: absolute;
-            /* Create a massive sphere to act as the background */
             width: 150vw; 
             height: 150vw;
             max-width: 1200px;
             max-height: 1200px;
             border-radius: 50%;
             
-            /* High-res equirectangular Earth map */
-            background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Solarsystemscope_texture_2k_earth_daymap.jpg/1024px-Solarsystemscope_texture_2k_earth_daymap.jpg');
+            /* High-contrast night map to serve as a base for the glowing AI theme */
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/The_earth_at_night.jpg/1024px-The_earth_at_night.jpg');
             background-size: auto 100%;
             
-            /* CSS filters to tint it green and blend it */
-            filter: sepia(1) hue-rotate(70deg) saturate(3) brightness(0.6);
+            /* Holographic AI GIS filters: invert colors, shift to neon cyan/blue, boost contrast */
+            filter: invert(1) hue-rotate(160deg) saturate(4) brightness(0.9) contrast(1.5);
             
-            /* Inner shadow creates the 3D spherical depth */
-            box-shadow: inset -50px -50px 100px rgba(0,0,0,0.9), 
-                        inset 50px 50px 100px rgba(255,255,255,0.2),
-                        0 0 60px rgba(0, 255, 100, 0.3);
+            /* Deep 3D atmospheric glow and shadow */
+            box-shadow: inset -80px -80px 150px rgba(0, 0, 0, 0.95), 
+                        inset 50px 50px 100px rgba(0, 229, 255, 0.2),
+                        0 0 120px rgba(0, 229, 255, 0.4);
             
-            /* Position it slightly off-center for an orbital view */
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             
-            animation: spinEarth 40s linear infinite;
+            animation: spinEarth 50s linear infinite;
             z-index: 0;
             pointer-events: none;
         }
 
-        /* Animate the background position to simulate 3D rotation */
+        /* Subtle scanner line animation to enhance the AI GIS vibe */
+        #auth-overlay::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 229, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.8);
+            animation: radarScan 6s linear infinite;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
         @keyframes spinEarth {
             0% { background-position: 0 0; }
             100% { background-position: 2048px 0; }
+        }
+
+        @keyframes radarScan {
+            0% { top: -10%; }
+            100% { top: 110%; }
         }
 
         .auth-main-title {
