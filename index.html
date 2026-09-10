@@ -59,40 +59,53 @@
         }
 
         /* ---------------------------------------------------
-           SECURITY / AUTHENTICATION OVERLAY 
+           SECURITY / AUTHENTICATION OVERLAY - 3D Spinning Earth
            --------------------------------------------------- */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: linear-gradient(45deg, #0a0a0a, #1a2a3a, #001122);
-            background-size: 400% 400%;
-            animation: aiGradient 15s ease infinite;
+            /* Deep space background */
+            background: #000811; 
             z-index: 9999; display: flex; flex-direction: column;
             justify-content: center; align-items: center; overflow-y: auto; padding: 20px;
-        }
-        
-        /* AI GIS Animated Background Grid */
-        #auth-overlay::before {
-            content: "";
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background-image: 
-                linear-gradient(rgba(0, 229, 255, 0.15) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 229, 255, 0.15) 1px, transparent 1px);
-            background-size: 40px 40px;
-            animation: gridMove 3s linear infinite;
-            pointer-events: none;
-            z-index: 0;
+            overflow: hidden;
         }
 
-        @keyframes aiGradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        #auth-overlay::before {
+            content: "";
+            position: absolute;
+            /* Create a massive sphere to act as the background */
+            width: 150vw; 
+            height: 150vw;
+            max-width: 1200px;
+            max-height: 1200px;
+            border-radius: 50%;
+            
+            /* High-res equirectangular Earth map */
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Solarsystemscope_texture_2k_earth_daymap.jpg/1024px-Solarsystemscope_texture_2k_earth_daymap.jpg');
+            background-size: auto 100%;
+            
+            /* CSS filters to tint it green and blend it */
+            filter: sepia(1) hue-rotate(70deg) saturate(3) brightness(0.6);
+            
+            /* Inner shadow creates the 3D spherical depth */
+            box-shadow: inset -50px -50px 100px rgba(0,0,0,0.9), 
+                        inset 50px 50px 100px rgba(255,255,255,0.2),
+                        0 0 60px rgba(0, 255, 100, 0.3);
+            
+            /* Position it slightly off-center for an orbital view */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            
+            animation: spinEarth 40s linear infinite;
+            z-index: 0;
+            pointer-events: none;
         }
-        
-        @keyframes gridMove {
+
+        /* Animate the background position to simulate 3D rotation */
+        @keyframes spinEarth {
             0% { background-position: 0 0; }
-            100% { background-position: 40px 40px; }
+            100% { background-position: 2048px 0; }
         }
 
         .auth-main-title {
